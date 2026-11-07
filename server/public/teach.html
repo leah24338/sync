@@ -107,6 +107,8 @@
     .now-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
     #nowCaption { font-size: 18px; line-height: 1.4; min-height: 1.4em; }
     #nowCaption.partial { color: var(--muted); }
+    #nowTopic { font-weight: 600; color: var(--accent); }
+    #nowTopic.muted { color: var(--muted); font-weight: 500; }
     body.paused #nowCaption { opacity: .5; }
     .level { height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; margin-top: 12px; max-width: 520px; }
     .level span { display: block; height: 100%; background: var(--ok); transform-origin: left; transform: scaleX(0); transition: transform 80ms linear; }
@@ -203,6 +205,7 @@
           <span class="muted" id="studentCount">0 students</span>
         </div>
         <p class="now"><span class="now-label">Now captioning</span><span id="nowCaption" class="partial">Waiting for you to speak…</span></p>
+        <p class="now"><span class="now-label">On the mind map</span><span id="nowTopic" class="muted">Appears once the mind map has topics</span></p>
         <div class="level" aria-hidden="true"><span id="level"></span></div>
       </div>
     </div>

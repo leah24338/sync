@@ -5,6 +5,7 @@ import type { EventLog, MindmapTopic } from "./events.js";
 
 const Changes = z.object({
   title: z.string(),
+  current: z.string(),
   topics: z.array(
     z.object({
       id: z.string(),
@@ -21,6 +22,7 @@ const SYSTEM = `You maintain a mind map of a live lecture. The lecture's main su
 You get the CURRENT MAP (JSON) and the NEW TRANSCRIPT since the last update. Return only what changed:
 - "title": the main subject. Repeat the current one; rename it only once the subject becomes clear.
 - "topics": only topics that are new, or existing topics that gain new details or links. For an existing topic, repeat its id and label and list only the new details.
+- "current": the id of the topic (existing or new) that the END of the new transcript is about, or "" if it's about none of them.
 
 Each topic has:
 - "id": keep existing ids; give new topics new ids (t1, t2, ...).
@@ -34,9 +36,16 @@ Rules:
 - Put each new detail under the topic it belongs to; create a topic only for something new.
 - If the teacher moves on to something unrelated, add it as its own topic with low relatedness instead of forcing it under an existing one.
 - Ignore filler, jokes and classroom logistics.
-- If nothing new is worth adding, return the current title and an empty topics list.`;
+- If nothing new is worth adding, return the current title and an empty topics list (still fill in "current").`;
+
+const Focus = z.object({ topicId: z.string() });
+
+const FOCUS_SYSTEM = `You track where a live lecture is on its mind map.
+Given the mind map's topics and the last few things the teacher said (most recent last), return the id of the topic the MOST RECENT sentences are about.
+If they aren't about any listed topic (small talk, logistics, or something not on the map yet), return an empty string.`;
 
 const MIN_NEW_WORDS = 15;
+const MIN_FOCUS_WORDS = 6;
 
 type MindMap = { title: string; topics: MindmapTopic[] };
 
@@ -52,20 +61,68 @@ export class MindMapper {
   private busy = false;
   private timer: NodeJS.Timeout;
 
+  // "You are here" tracking: the last few sentences, and words said since the last check.
+  private recent: string[] = [];
+  private wordsSinceFocus = 0;
+  private focusId: string | null = null;
+  private focusBusy = false;
+  private focusTimer: NodeJS.Timeout;
+
   constructor(private log: EventLog) {
     this.timer = setInterval(() => void this.update(), config.mindmapIntervalMs);
+    this.focusTimer = setInterval(() => void this.checkFocus(), config.focusIntervalMs);
   }
 
   addSpeech(text: string): void {
     this.pending.push(text);
+    this.remember(text);
   }
 
   addBoard(text: string): void {
     this.pending.push(`[Written on the board] ${text}`);
+    this.remember(`[Written on the board] ${text}`);
   }
 
   stop(): void {
     clearInterval(this.timer);
+    clearInterval(this.focusTimer);
+  }
+
+  private remember(text: string): void {
+    this.recent = [...this.recent, text].slice(-4);
+    this.wordsSinceFocus += text.split(/\s+/).length;
+  }
+
+  /** Sends a focus event only when the topic actually changes. */
+  private setFocus(topicId: string): void {
+    if (topicId === this.focusId || !this.map.topics.some((t) => t.id === topicId)) return;
+    this.focusId = topicId;
+    this.log.push({ type: "focus", t: this.log.now(), topicId });
+    console.log(`[focus] now on "${this.map.topics.find((t) => t.id === topicId)?.label}"`);
+  }
+
+  /**
+   * Between mind map updates, a small, cheap call (topic list + last few sentences) checks which
+   * existing topic the teacher is on, so the "you are here" dot follows them back to earlier ideas.
+   * It runs only after new speech, and "none of these" keeps the dot where it was.
+   */
+  private async checkFocus(): Promise<void> {
+    if (this.focusBusy || this.busy || this.wordsSinceFocus < MIN_FOCUS_WORDS || !this.map.topics.length) return;
+    this.focusBusy = true;
+    this.wordsSinceFocus = 0;
+    try {
+      const topics = this.map.topics.map((t) => `${t.id}: ${t.label}${t.details.length ? ` (${t.details.join("; ")})` : ""}`);
+      const result = await askJson({
+        label: "focus",
+        schema: Focus,
+        effort: "low",
+        system: FOCUS_SYSTEM,
+        content: `TOPICS:\n${topics.join("\n")}\n\nWHAT THE TEACHER JUST SAID:\n${this.recent.join("\n")}`,
+      });
+      if (result?.topicId) this.setFocus(result.topicId);
+    } finally {
+      this.focusBusy = false;
+    }
   }
 
   private async update(): Promise<void> {
@@ -93,6 +150,11 @@ export class MindMapper {
         console.log(`[mindmap] update sent: ${merged.topics.length} topics`);
       } else {
         console.log("[mindmap] nothing new worth adding (filler, or already covered)");
+      }
+      // The update already knows where the speech ended up, so no separate focus check is needed.
+      if (changes.current) {
+        this.setFocus(changes.current);
+        this.wordsSinceFocus = 0;
       }
     } finally {
       this.busy = false;

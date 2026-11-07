@@ -40,6 +40,7 @@
 <body>
 <header>
   <span id="status">Connecting…</span>
+  <span id="focus" style="color: var(--accent); font-weight: 600"></span>
   <span class="tabs">
     <button id="tabFeed" aria-pressed="true">Feed</button>
     <button id="tabMap" aria-pressed="false">Mind map</button>
@@ -80,9 +81,22 @@
     return node;
   }
 
-  function renderMath(target, latex) {
+  function renderMath(target, latex, plain) {
     if (window.katex) katex.render(latex, target, { throwOnError: false, displayMode: true });
-    else target.textContent = latex;
+    else target.textContent = plain ?? latex;
+  }
+
+  // Text lines can contain inline maths in $…$; render those parts with KaTeX, the rest as text.
+  function renderText(target, content, plain) {
+    if (!window.katex) return void (target.textContent = plain ?? content);
+    content.split(/(?<!\\)\$([^$]+)\$/).forEach((part, i) => {
+      if (i % 2 === 0) target.append(part);
+      else {
+        const span = document.createElement("span");
+        katex.render(part, span, { throwOnError: false });
+        target.append(span);
+      }
+    });
   }
 
   // ---------- Mind map tab ----------
@@ -91,6 +105,14 @@
 
   let latestMap = null;
   let mapDirty = false;
+
+  // "You are here": the topic the teacher is on, by id from the latest mind map.
+  let topicLabels = new Map();
+  let focusId = null;
+  function showFocus() {
+    const label = topicLabels.get(focusId);
+    $("focus").textContent = label ? `● Now: ${label}` : "";
+  }
   let mm = null;
   let transformer = null;
 
@@ -169,12 +191,18 @@
       card.append(img);
       for (const block of event.blocks) {
         const row = el("div");
-        if (block.kind === "equation") renderMath(row, block.content);
-        else row.textContent = block.content;
+        if (block.kind === "equation") renderMath(row, block.content, block.plain);
+        else renderText(row, block.content, block.plain);
+        if (block.spoken) row.setAttribute("aria-label", block.spoken);
         card.append(row);
       }
       feed.append(card);
+    } else if (event.type === "focus") {
+      focusId = event.topicId;
+      showFocus();
     } else if (event.type === "mindmap") {
+      topicLabels = new Map((event.topics ?? []).map((t) => [t.id, t.label]));
+      showFocus();
       latestMap = event.markdown;
       const topics = (event.markdown.match(/^## /gm) ?? []).length;
       const line = el("div", "mapline", `Mind map updated · ${topics} topic${topics === 1 ? "" : "s"} · `);
@@ -204,6 +232,9 @@
       count = 0;
       retry = 500;
       resetMap();
+      topicLabels = new Map();
+      focusId = null;
+      showFocus();
       status.textContent = "Live · waiting for events";
     };
     ws.onmessage = (e) => handle(JSON.parse(e.data));

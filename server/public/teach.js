@@ -483,13 +483,32 @@ setInterval(() => {
 // what's being captioned and to confirm when a board photo has been read.
 
 let boardContent = new Set();
+let topicLabels = new Map();
+let focusId = null;
+
+function showFocus() {
+  const label = topicLabels.get(focusId);
+  if (!label) return;
+  $("nowTopic").textContent = `● ${label}`;
+  $("nowTopic").classList.remove("muted");
+}
 
 function watchFeed() {
   const ws = new WebSocket(`${wsBase}/ws?role=preview`);
-  ws.onopen = () => (boardContent = new Set());
+  ws.onopen = () => {
+    boardContent = new Set();
+    topicLabels = new Map();
+    focusId = null;
+  };
   ws.onmessage = (e) => {
     const event = JSON.parse(e.data);
-    if (event.type === "caption") {
+    if (event.type === "mindmap") {
+      topicLabels = new Map((event.topics ?? []).map((t) => [t.id, t.label]));
+      showFocus();
+    } else if (event.type === "focus") {
+      focusId = event.topicId;
+      showFocus();
+    } else if (event.type === "caption") {
       $("nowCaption").textContent = event.text;
       $("nowCaption").classList.toggle("partial", !event.final);
     } else if (event.type === "board") {

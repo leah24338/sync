@@ -38,6 +38,7 @@ function retime(event: LectureEvent, prefix: string, t: number): LectureEvent {
     case "board":
       return { ...event, id: prefix + event.id, t };
     case "mindmap":
+    case "focus":
       return { ...event, t };
   }
 }
