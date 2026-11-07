@@ -12,7 +12,17 @@ export type AnnotationEvent = {
   level: 1 | 2 | 3;
 };
 export type BoardEvent = { type: "board"; id: string; t: number; snapshotUrl: string; blocks: BoardBlock[] };
-export type MindmapEvent = { type: "mindmap"; t: number; markdown: string };
+export type MindmapTopic = {
+  id: string;
+  label: string;
+  /** How closely the topic relates to the lecture's main subject: 1 = core … 0 = unrelated. */
+  relatedness: number;
+  details: string[];
+  /** Other topics this one connects to, with strength 0–1. */
+  links: { to: string; strength: number }[];
+};
+/** `markdown` is the same map as an outline (for simple tree views); `title` + `topics` carry relatedness. */
+export type MindmapEvent = { type: "mindmap"; t: number; markdown: string; title?: string; topics?: MindmapTopic[] };
 
 export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent;
 

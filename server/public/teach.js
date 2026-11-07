@@ -16,15 +16,19 @@ const post = (path, body) =>
 async function refreshStatus() {
   try {
     const s = await fetch("/api/status").then((r) => r.json());
-    const flag = (on, name) => `<span class="pill ${on ? "on" : "off"}">${name} ${on ? "on" : "off"}</span>`;
-    $("serverStatus").innerHTML =
-      `${flag(s.claude, "Claude")} ${flag(s.deepgram, "Deepgram")} · ${s.students} viewer(s) · ${s.events} events`;
+    const flag = (on, name) => `<span class="pill ${on ? "on" : "off"}" title="${name} ${on ? "connected" : "key missing"}">${name}</span>`;
+    const count = (n, word) => `<span class="pill neutral">${n} ${word}${n === 1 ? "" : "s"}</span>`;
+    $("serverStatus").innerHTML = `${flag(s.claude, "Claude")}${flag(s.deepgram, "Deepgram")}${count(s.students, "viewer")}${count(s.events, "event")}`;
   } catch {
-    $("serverStatus").textContent = "Server unreachable";
+    $("serverStatus").innerHTML = '<span class="pill off">Server unreachable</span>';
   }
 }
 refreshStatus();
 setInterval(refreshStatus, 3000);
+
+// The student app is only there when the page is opened through the app (port 8080 or the
+// tunnel), not straight from the lecture server.
+if (location.port === "3001") $("studentLinks").hidden = true;
 
 // ---------- Microphone ----------
 // MediaRecorder produces WebM/Opus chunks every 250 ms; they go straight to Deepgram via our server.
@@ -52,6 +56,8 @@ $("micStart").onclick = async () => {
   micWanted = true;
   $("micStart").disabled = true;
   $("micStop").disabled = false;
+  document.body.classList.add("mic-on");
+  stopLevelMeter = startLevelMeter(micStream);
   connectTeacher(mimeType);
 };
 
@@ -61,10 +67,36 @@ $("micStop").onclick = () => {
   teacherWs?.close();
   micStream?.getTracks().forEach((t) => t.stop());
   micStream = null;
+  stopLevelMeter?.();
+  document.body.classList.remove("mic-on");
   $("micStart").disabled = false;
   $("micStop").disabled = true;
   $("micStatus").textContent = "Mic off.";
 };
+
+// Live input level, so the teacher can see the mic is actually hearing them.
+let stopLevelMeter = null;
+function startLevelMeter(stream) {
+  const audio = new AudioContext();
+  const analyser = audio.createAnalyser();
+  analyser.fftSize = 512;
+  audio.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Uint8Array(analyser.fftSize);
+  let frame;
+  const tick = () => {
+    analyser.getByteTimeDomainData(samples);
+    let peak = 0;
+    for (const s of samples) peak = Math.max(peak, Math.abs(s - 128));
+    $("level").style.transform = `scaleX(${Math.min(1, peak / 64)})`;
+    frame = requestAnimationFrame(tick);
+  };
+  tick();
+  return () => {
+    cancelAnimationFrame(frame);
+    audio.close();
+    $("level").style.transform = "scaleX(0)";
+  };
+}
 
 function connectTeacher(mimeType) {
   $("micStatus").textContent = "Connecting…";
@@ -124,7 +156,7 @@ $("camStart").onclick = async () => {
     camOn = true;
     $("camStart").disabled = true;
     $("capture").disabled = false;
-    $("boardStatus").textContent = "Camera on. Frame the whiteboard, then press Capture board.";
+    $("boardStatus").textContent = "Camera on. Fill the frame with the board, avoid glare, then press Capture board.";
   } catch (error) {
     $("boardStatus").textContent = `Camera blocked: ${error.message}`;
   }
