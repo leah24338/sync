@@ -40,6 +40,9 @@ let stopReplay: (() => void) | null = null;
 
 const studentWss = new WebSocketServer({ noServer: true });
 const teacherWss = new WebSocketServer({ noServer: true });
+// The teacher console's own feed and its preview connect with ?role=preview so they aren't
+// counted as students.
+const previews = new WeakSet<WebSocket>();
 const teacherSessions = new Set<{ ws: WebSocket; assembler: CaptionAssembler; close: () => void }>();
 
 // Every event is serialized once and sent to every connected phone.
@@ -160,7 +163,7 @@ app.use("/teach", express.static(config.publicDir, { index: "teach.html" }));
 app.get("/api/status", (_req, res) => {
   res.json({
     events: log.all().length,
-    students: studentWss.clients.size,
+    students: [...studentWss.clients].filter((ws) => !previews.has(ws)).length,
     teachers: teacherWss.clients.size,
     claude: claudeEnabled,
     deepgram: Boolean(config.deepgramKey),
@@ -230,7 +233,10 @@ const server = http.createServer(app);
 server.on("upgrade", (req, socket, head) => {
   const url = new URL(req.url ?? "/", "http://localhost");
   if (url.pathname === "/ws") {
-    studentWss.handleUpgrade(req, socket, head, (ws) => studentWss.emit("connection", ws, req));
+    studentWss.handleUpgrade(req, socket, head, (ws) => {
+      if (url.searchParams.get("role") === "preview") previews.add(ws);
+      studentWss.emit("connection", ws, req);
+    });
   } else if (url.pathname === "/ws/teacher" && (!config.teacherKey || url.searchParams.get("key") === config.teacherKey)) {
     teacherWss.handleUpgrade(req, socket, head, (ws) => teacherWss.emit("connection", ws, req));
   } else {

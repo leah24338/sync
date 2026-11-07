@@ -194,7 +194,9 @@
   }
 
   function connect() {
-    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    // Embedded in the teacher console (?preview=1): don't count as a student.
+    const role = new URLSearchParams(location.search).has("preview") ? "?role=preview" : "";
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws${role}`);
     ws.onopen = () => {
       // The server re-sends the whole lecture on every connect, so start from a clean slate.
       feed.replaceChildren();

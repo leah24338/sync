@@ -14,7 +14,8 @@ const BoardState = z.object({
   ),
 });
 
-const SYSTEM = `You read photos of a classroom whiteboard and keep a clean digital copy of what is written on it.
+const SYSTEM = `You read images of what a teacher is showing (a photo of a classroom whiteboard, or a screenshot of their shared screen: slides or a digital whiteboard) and keep a clean digital copy of the content.
+For screenshots, copy only the lesson content: ignore window frames, toolbars, taskbars, slide numbers and the mouse cursor.
 
 You get the CURRENT COPY (JSON) and a NEW PHOTO. Return the full updated board:
 - Keep the id and content of blocks that are still on the board and unchanged.

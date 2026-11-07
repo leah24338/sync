@@ -223,6 +223,26 @@ size that can be cached) and a database (it stores data; it doesn't reduce AI ca
 ### Student WebSocket: `/ws`
 Receive-only. Each message is one JSON event. On connect the server re-sends every past event,
 then streams new ones. A reset closes the connection (code 1012); the app reconnects and starts fresh.
+`/ws?role=preview` is the same feed but isn't counted as a student (used by the teacher console
+and its preview), so "N students joined" is accurate.
+
+## Teacher console (`/teach/`)
+
+Built so a teacher needs one button:
+
+| Part | What it does |
+|---|---|
+| **Start lecture** | Turns on the microphone and the board camera together (each can be unticked, e.g. a phone that's only the camera). Plain-language errors if access is blocked, no device is found, or the page isn't on https |
+| **Live card** | LIVE badge, timer, "N students joined", the line being captioned right now, and a mic level bar |
+| **Pause captions** (or `P`) | Stops sending audio without hanging up, for private remarks; resuming is instant |
+| **End lecture** | Stops the devices and saves the lecture automatically, so it can be replayed later |
+| **Board source: Camera or Screen share** | Camera points at a whiteboard. Screen share captures slides or a digital whiteboard from the teacher's computer (desktop browsers only), turns auto-capture on (key presses go to the slides app, not the console), sends larger images (1600 px) for small slide text, and stops cleanly when sharing ends from the browser bar. The board reader ignores window frames, toolbars, slide numbers and the cursor |
+| **Capture board** (or `Space`, `→`, Page Down, or a presentation clicker) | Flash, "photo sent", then "Board read ✓ 2 new lines" once Claude has read it, or "no new writing found" |
+| **Show join code** | QR code and link for students; warns when the console is opened on `localhost`, which phones can't reach |
+| **Device pickers** | Appear only when there's more than one mic or camera (clip-on mic, USB webcam) |
+| **Settings & tools** (collapsed) | Explanation settings, replaying the demo or a saved lecture (listed by date), save now, clear for everyone |
+
+The audio protocol and capture logic are unchanged from the earlier console.
 
 ### Teacher WebSocket: `/ws/teacher`
 Page → server: `{"type":"start"}` before each recording, then binary WebM/Opus chunks.
@@ -255,8 +275,7 @@ server/
   src/mindmap.ts    Incremental mind map outline
   src/replay.ts     Play a saved event list with original timing
   src/config.ts     Settings and API keys from wie_hack/.env
-  public/teach.*    Teacher console: camera with capture and auto-capture, mic with live level
-                    meter and LIVE badge, explanation settings, replay/save/reset, live preview
+  public/teach.*    Teacher console (see "Teacher console" below)
   public/viewer.html Test viewer: Feed tab (captions, notes, board with KaTeX) and Mind map tab
                     (drawn live with markmap), plus the per-student explanation filter
   mock/lecture.json Demo lecture (same as the Lovable mock data)
@@ -363,6 +382,18 @@ The app doesn't use the annotation `level` yet (follow-up prompt in `LOVABLE_PRO
 so a closely related phrase may get explained twice ("discriminant", then "negative discriminant").
 
 ## Changelog
+
+- **2026-11-07:** Screen share as a board source (Camera / Screen share switch). Verified: the
+  switch updates the console; a slide screenshot with an app toolbar was read as a title plus
+  three LaTeX equations, ignoring the toolbar and slide number. Actual screen sharing not testable
+  in the browser pane.
+
+- **2026-11-07:** Teacher console rebuilt around one Start lecture / End lecture flow: pause
+  captions, timer, live caption line, student count (previews excluded via `/ws?role=preview`),
+  join QR dialog, keyboard and clicker capture with "Board read ✓" confirmation, device pickers,
+  plain-language errors, auto-save on End, rarely used controls collapsed. Verified: idle/live
+  layouts, QR dialog, student counting, board-read confirmation; mic and camera clicks not
+  testable in the browser pane.
 
 - **2026-11-07:** Mind map topics now carry `relatedness` (0–1) and `links`; Claude returns only
   changes and the server merges them (topics never disappear or move). Demo lecture gains

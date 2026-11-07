@@ -4,108 +4,165 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lecture Lens · Teacher</title>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
-      --bg: #f4f4f1; --card: #ffffff; --ink: #1b1b19; --muted: #6a6a64; --line: #e3e3dd; --soft: #f0f0eb;
-      --accent: #2453c7; --accent-ink: #ffffff; --accent-soft: #e8eefc;
-      --live: #d93a2f; --ok: #1f8a4c; --ok-soft: #e4f4ea; --bad: #b8332a; --bad-soft: #fbe9e7;
-      --radius: 14px; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+      --bg: #f5f5f2; --card: #ffffff; --ink: #1b1b19; --muted: #6a6a64; --line: #e4e4de; --soft: #f0f0eb;
+      --accent: #2453c7; --accent-ink: #ffffff; --accent-soft: #e9eefc;
+      --live: #d93a2f; --live-soft: #fbe9e7; --ok: #1f8a4c; --ok-soft: #e4f4ea; --warn-soft: #fff4dc; --warn: #8a5a00;
+      --radius: 16px; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #121211; --card: #1c1c1a; --ink: #ecece8; --muted: #a2a29b; --line: #2f2f2b; --soft: #252522;
+        --bg: #121211; --card: #1c1c1a; --ink: #ecece8; --muted: #a2a29b; --line: #2f2f2b; --soft: #262623;
         --accent: #7ea2ff; --accent-ink: #0e1630; --accent-soft: #1d2640;
-        --live: #ff6b5e; --ok: #4cc27f; --ok-soft: #173123; --bad: #ff7a6e; --bad-soft: #3a1e1b;
+        --live: #ff6b5e; --live-soft: #3a1e1b; --ok: #4cc27f; --ok-soft: #173123; --warn-soft: #3a2e12; --warn: #f2c46b;
         --shadow: none;
       }
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-    button, select { font: inherit; color: inherit; }
+    button, select, input { font: inherit; color: inherit; }
     :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    [hidden] { display: none !important; }
+
+    /* What shows when: driven by classes on <body> set by teach.js */
+    body:not(.live) .live-only, body.live .idle-only { display: none !important; }
+    body.live #startLecture, body:not(.live) #endLecture, body:not(.mic-on) #pause, body.cam-on #camStart { display: none; }
 
     /* Top bar */
-    .topbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
-      padding: 12px 20px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+    .topbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+      padding: 10px 20px; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
     .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
-    .mark { width: 30px; height: 30px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; }
-    .brand h1 { font-size: 17px; margin: 0; line-height: 1.2; }
+    .mark { width: 32px; height: 32px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; }
+    .brand h1 { font-size: 17px; margin: 0; line-height: 1.15; }
     .brand small { display: block; color: var(--muted); font-size: 12px; }
-    .live-badge { display: none; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: var(--bad-soft); color: var(--live); font-weight: 600; font-size: 13px; }
-    .live-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 1.4s infinite; }
-    body.mic-on .live-badge { display: inline-flex; }
-    @keyframes pulse { 50% { opacity: .35; } }
-    @media (prefers-reduced-motion: reduce) { .live-badge::before { animation: none; } }
-    #serverStatus { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; }
-    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-    .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-    .pill.on { background: var(--ok-soft); color: var(--ok); }
-    .pill.off { background: var(--bad-soft); color: var(--bad); }
-    .pill.neutral { background: var(--soft); color: var(--muted); }
-    .pill.neutral::before { display: none; }
-    .links { display: flex; gap: 8px; }
-    .links a { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 13px; padding: 6px 10px; border-radius: 8px; }
-    .links a:hover { background: var(--accent-soft); }
+    #serverStatus { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--soft); color: var(--muted); }
+    .chip.ok { background: var(--ok-soft); color: var(--ok); }
+    .chip.bad { background: var(--live-soft); color: var(--live); }
+    .chip.ok::before, .chip.bad::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 
     /* Layout */
-    main { max-width: 1320px; margin: 0 auto; padding: 20px; display: grid; gap: 16px;
+    main { max-width: 1320px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; align-items: start;
       grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-      grid-template-areas: "cam preview" "mic preview" "explain preview" "lecture preview"; align-items: start; }
-    #camCard { grid-area: cam; } #micCard { grid-area: mic; } #explainCard { grid-area: explain; }
-    #lectureCard { grid-area: lecture; } #previewCard { grid-area: preview; position: sticky; top: 76px; }
-    @media (max-width: 900px) {
-      main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "cam" "mic" "explain" "lecture" "preview"; padding: 12px; }
+      grid-template-areas: "control control" "left preview"; }
+    #controlCard { grid-area: control; }
+    .left { grid-area: left; display: grid; gap: 16px; }
+    #previewCard { grid-area: preview; position: sticky; top: 70px; }
+    @media (max-width: 920px) {
+      main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "control" "cam" "preview" "tools"; padding: 12px; }
+      .left { display: contents; }
+      #camCard { grid-area: cam; } #toolsCard { grid-area: tools; }
       #previewCard { position: static; }
     }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
-    .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    .card h2 { font-size: 15px; margin: 0; white-space: nowrap; }
-    .hint { color: var(--muted); font-size: 13px; margin: 0; text-align: right; }
-    @media (max-width: 560px) { .card-head { flex-direction: column; gap: 2px; } .hint { text-align: left; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .card h2 { font-size: 16px; margin: 0; }
+    .hint { color: var(--muted); font-size: 13px; margin: 0; }
     .status { color: var(--muted); font-size: 13px; margin-top: 10px; min-height: 1.5em; }
+    .status:empty, .hint:empty { margin: 0; min-height: 0; }
+    .devices:not(:has(.device:not([hidden]))) { display: none !important; }
     .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    kbd { font: 600 11px/1 ui-monospace, Menlo, monospace; padding: 3px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--soft); }
 
     /* Buttons */
-    .btn { min-height: 44px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-weight: 600; }
+    .btn { min-height: 44px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); cursor: pointer; font-weight: 600; }
     .btn:hover:not(:disabled) { background: var(--soft); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
     .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
     .btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, black); }
-    .btn.big { min-height: 52px; padding: 12px 22px; font-size: 16px; }
-    .btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
-    .btn.danger:hover { background: var(--bad-soft); }
-    .btn.stop { background: var(--live); border-color: var(--live); color: #fff; }
-    /* Start buttons disappear once their device is running, leaving one clear action. */
-    #micStart:disabled, #micStop:disabled, #camStart:disabled { display: none; }
+    .btn.huge { min-height: 60px; padding: 14px 28px; font-size: 17px; border-radius: 14px; }
+    .btn.end { background: var(--live); border-color: var(--live); color: #fff; }
+    .btn.end:hover { background: color-mix(in srgb, var(--live) 88%, black); }
+    .btn.danger { color: var(--live); border-color: color-mix(in srgb, var(--live) 40%, var(--line)); }
+    .btn.danger:hover { background: var(--live-soft); }
+    .btn.ghost { border-color: transparent; color: var(--accent); }
+    .btn.ghost:hover { background: var(--accent-soft); }
+    body.paused #pause { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+
+    /* Lecture control card */
+    .control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px 24px; align-items: center; }
+    .control h2 { font-size: 20px; margin: 0 0 4px; }
+    .control-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .control .wide { grid-column: 1 / -1; }
+    @media (max-width: 640px) { .control { grid-template-columns: minmax(0, 1fr); } .control-actions { justify-content: stretch; } .control-actions .btn { flex: 1; } }
+    .steps { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 13px; }
+    .steps li::before { content: counter(step); counter-increment: step; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 11px; }
+    .steps { counter-reset: step; }
+    .toggles { margin-top: 14px; gap: 18px; }
+    .switch { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; font-weight: 600; }
+    .switch input { width: 20px; height: 20px; accent-color: var(--accent); }
+    .live-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; background: var(--live-soft); color: var(--live); font-weight: 700; font-size: 13px; letter-spacing: .03em; }
+    .badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.4s infinite; }
+    body.paused .badge { background: var(--warn-soft); color: var(--warn); }
+    body.paused .badge::before { animation: none; }
+    .badge .when-paused, body.paused .badge .when-live { display: none; }
+    body.paused .badge .when-paused { display: inline; }
+    @keyframes pulse { 50% { opacity: .3; } }
+    #timer { font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); font-weight: 500; }
+    .now { margin: 12px 0 0; display: grid; gap: 2px; }
+    .now-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    #nowCaption { font-size: 18px; line-height: 1.4; min-height: 1.4em; }
+    #nowCaption.partial { color: var(--muted); }
+    body.paused #nowCaption { opacity: .5; }
+    .level { height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; margin-top: 12px; max-width: 520px; }
+    .level span { display: block; height: 100%; background: var(--ok); transform-origin: left; transform: scaleX(0); transition: transform 80ms linear; }
+    body.paused .level span { background: var(--muted); }
+    body:not(.mic-on) .level { display: none; }
+    .devices { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+    .device { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+    select { appearance: none; -webkit-appearance: none; min-height: 40px; padding: 6px 34px 6px 12px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer;
+      background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 12px center; max-width: 100%; }
+
+    /* Board source switch */
+    .segmented { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--soft); gap: 2px; }
+    .segmented label { position: relative; display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
+    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented label:has(input:checked) { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .segmented label:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 1px; }
+    #sourceHint { margin: -6px 0 12px; }
 
     /* Camera */
-    .stage { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: var(--soft); display: grid; place-items: center; margin-bottom: 12px; }
+    .stage { position: relative; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--soft); display: grid; place-items: center; margin-bottom: 14px; }
     .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
-    .stage .placeholder { color: var(--muted); text-align: center; padding: 16px; font-size: 14px; }
-    .switch { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; font-size: 14px; }
-    .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
-    #meter { display: block; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); margin-top: 6px; }
+    .placeholder { display: grid; gap: 12px; justify-items: center; color: var(--muted); text-align: center; padding: 20px; font-size: 14px; }
+    .flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+    .flash.go { animation: flash 450ms ease-out; }
+    @keyframes flash { 0% { opacity: .75; } 100% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .flash.go, .badge::before { animation: none; } }
+    #capture { flex: 1; min-width: 200px; }
+    #meter { display: block; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); margin-top: 8px; }
     #meter:empty { display: none; }
 
-    /* Mic */
-    .mic-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .level { flex: 1; min-width: 140px; height: 10px; border-radius: 999px; background: var(--soft); overflow: hidden; }
-    .level span { display: block; height: 100%; width: 100%; background: var(--ok); transform-origin: left; transform: scaleX(0); transition: transform 80ms linear; }
-
-    /* Explanations */
-    .field { display: grid; gap: 6px; flex: 1; min-width: 200px; }
-    .field span { font-size: 13px; font-weight: 600; }
-    .field select, #sessions { appearance: none; -webkit-appearance: none; min-height: 44px; padding: 8px 36px 8px 12px; border-radius: 10px; border: 1px solid var(--line);
-      background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23888' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center; cursor: pointer; }
-
-    /* Lecture */
-    .group { display: grid; gap: 10px; }
-    .group + .group { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-    .group-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
-    #sessions { flex: 1; min-width: 180px; }
-
     /* Preview */
-    #previewCard iframe { width: 100%; height: min(78vh, 760px); min-height: 480px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+    #previewCard iframe { width: 100%; height: min(72vh, 720px); min-height: 460px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+
+    /* Settings & tools */
+    .tools > summary { cursor: pointer; font-weight: 700; font-size: 16px; list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 32px; }
+    .tools > summary::-webkit-details-marker { display: none; }
+    .tools > summary::after { content: "Show"; font-size: 13px; color: var(--accent); font-weight: 600; }
+    .tools[open] > summary::after { content: "Hide"; }
+    .tools[open] > summary { margin-bottom: 14px; }
+    .group { display: grid; gap: 10px; }
+    .group + .group { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .group-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    .field { display: grid; gap: 6px; flex: 1; min-width: 200px; font-size: 13px; font-weight: 600; }
+    .field select { min-height: 44px; }
+    #sessions { flex: 1; min-width: 180px; min-height: 44px; }
+
+    /* Toast + join dialog */
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; z-index: 5;
+      background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 12px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,.2); transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px); }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    dialog { border: 0; border-radius: 20px; padding: 28px; max-width: min(440px, calc(100vw - 32px)); background: var(--card); color: var(--ink); text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+    dialog::backdrop { background: rgba(0,0,0,.45); }
+    dialog h2 { margin: 0 0 6px; font-size: 22px; }
+    #qr { display: grid; place-items: center; margin: 18px auto; padding: 14px; background: #fff; border-radius: 14px; width: fit-content; }
+    #joinUrl { display: block; word-break: break-all; font-weight: 600; color: var(--accent); margin-bottom: 14px; }
+    .warn { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin: 0 0 14px; text-align: left; }
   </style>
 </head>
 <body>
@@ -117,79 +174,105 @@
       <small>Teacher console</small>
     </div>
   </div>
-  <span class="live-badge">Live</span>
-  <div id="serverStatus">Connecting…</div>
-  <nav class="links" id="studentLinks" aria-label="Student pages">
-    <a href="/?mode=live" target="_blank" rel="noopener">Student view ↗</a>
-    <a href="/join" target="_blank" rel="noopener">Join QR ↗</a>
-  </nav>
+  <div id="serverStatus" aria-label="System status"></div>
+  <button class="btn ghost" id="joinBtn">Show join code</button>
 </header>
 
 <main>
+  <!-- One place to run the lecture -->
+  <section class="card control" id="controlCard" aria-label="Lecture">
+    <div>
+      <div class="idle-only">
+        <h2>Ready when you are</h2>
+        <p class="hint">Starting turns on live captions and the board camera. Students follow along on their phones.</p>
+        <ol class="steps">
+          <li>Show students the join code</li>
+          <li>Start the lecture and teach as usual</li>
+          <li>After writing on the board, press <kbd>Space</kbd> or your clicker</li>
+        </ol>
+        <div class="row toggles">
+          <label class="switch"><input type="checkbox" id="useMic" checked /> Microphone</label>
+          <label class="switch"><input type="checkbox" id="useCam" checked /> Board (camera or screen)</label>
+        </div>
+        <p class="hint" id="micNote"></p>
+      </div>
+      <div class="live-only">
+        <div class="live-head">
+          <span class="badge"><span class="when-live">LIVE</span><span class="when-paused">PAUSED</span></span>
+          <span id="timer">00:00</span>
+          <span class="muted" id="studentCount">0 students</span>
+        </div>
+        <p class="now"><span class="now-label">Now captioning</span><span id="nowCaption" class="partial">Waiting for you to speak…</span></p>
+        <div class="level" aria-hidden="true"><span id="level"></span></div>
+      </div>
+    </div>
+    <div class="control-actions">
+      <button class="btn primary huge" id="startLecture">Start lecture</button>
+      <button class="btn huge" id="pause" title="Shortcut: P">Pause captions</button>
+      <button class="btn huge end" id="endLecture">End lecture</button>
+    </div>
+    <div class="wide live-only devices">
+      <label class="device" hidden>Microphone <select id="micDevice"></select></label>
+      <label class="device" hidden>Camera <select id="camDevice"></select></label>
+    </div>
+    <div class="wide status" id="micStatus" role="status"></div>
+  </section>
+
+  <div class="left">
   <section class="card" id="camCard" aria-labelledby="camTitle">
     <div class="card-head">
-      <h2 id="camTitle">Whiteboard camera</h2>
-      <p class="hint">Camera needs HTTPS on phones: use the tunnel address.</p>
+      <h2 id="camTitle">Board</h2>
+      <div class="segmented" role="radiogroup" aria-label="Board source">
+        <label><input type="radio" name="source" value="camera" checked /> Camera</label>
+        <label id="screenOption"><input type="radio" name="source" value="screen" /> Screen share</label>
+      </div>
     </div>
+    <p class="hint" id="sourceHint">Capture: <kbd>Space</kbd> <kbd>→</kbd> or a presentation clicker</p>
     <div class="stage">
       <video id="video" playsinline muted hidden></video>
-      <div class="placeholder">Point a phone or webcam at the board, then start the camera.</div>
+      <div class="placeholder">
+        <span id="placeholderText">Point a phone or webcam at the board.</span>
+        <button class="btn" id="camStart">Turn on camera</button>
+      </div>
+      <div class="flash" id="flash"></div>
     </div>
     <div class="row">
-      <button class="btn" id="camStart">Start camera</button>
-      <button class="btn primary big" id="capture" disabled>Capture board</button>
-      <label class="switch"><input type="checkbox" id="auto" /> Auto-capture when the board changes</label>
+      <button class="btn primary huge" id="capture" disabled>Capture board</button>
+      <label class="switch"><input type="checkbox" id="auto" /> Auto-capture</label>
     </div>
     <code id="meter"></code>
-    <div class="status" id="boardStatus" role="status">Camera off.</div>
+    <div class="status" id="boardStatus" role="status">On a phone, open this page through the https address so the camera works.</div>
   </section>
 
-  <section class="card" id="micCard" aria-labelledby="micTitle">
-    <div class="card-head">
-      <h2 id="micTitle">Microphone</h2>
-      <p class="hint">Chrome, Edge or Firefox. A clip-on mic works best.</p>
-    </div>
-    <div class="mic-row">
-      <button class="btn primary big" id="micStart">Start mic</button>
-      <button class="btn big stop" id="micStop" disabled>Stop mic</button>
-      <div class="level" aria-hidden="true"><span id="level"></span></div>
-    </div>
-    <div class="status" id="micStatus" role="status">Mic off.</div>
-  </section>
-
-  <section class="card" id="explainCard" aria-labelledby="explainTitle">
-    <div class="card-head">
-      <h2 id="explainTitle">Explanations</h2>
-      <p class="hint">For everyone. Students can show fewer on their own phone.</p>
-    </div>
-    <div class="row">
-      <label class="field"><span>Idioms &amp; sarcasm</span>
-        <select id="idioms">
-          <option value="off">Off</option>
-          <option value="tricky">Only tricky ones</option>
-          <option value="standard">Standard</option>
-          <option value="all">Everything</option>
-        </select>
-      </label>
-      <label class="field"><span>Key terms</span>
-        <select id="terms">
-          <option value="off">Off</option>
-          <option value="tricky">Only advanced ones</option>
-          <option value="standard">Standard</option>
-          <option value="all">Everything</option>
-        </select>
-      </label>
-    </div>
-    <div class="status" id="settingsStatus" role="status">Turning both off skips the AI on every sentence, which is most of the running cost.</div>
-  </section>
-
-  <section class="card" id="lectureCard" aria-labelledby="lectureTitle">
-    <div class="card-head"><h2 id="lectureTitle">Lecture</h2></div>
+  <details class="card tools" id="toolsCard">
+    <summary>Settings &amp; tools</summary>
     <div class="group">
-      <span class="group-label">Replay (no AI cost)</span>
+      <span class="group-label">Explanations for students</span>
       <div class="row">
-        <button class="btn" id="replayMock">Replay demo lecture</button>
-        <select id="sessions" aria-label="Saved sessions"><option value="">Saved sessions…</option></select>
+        <label class="field">Idioms &amp; sarcasm
+          <select id="idioms">
+            <option value="off">Off</option>
+            <option value="tricky">Only tricky ones</option>
+            <option value="standard">Standard</option>
+            <option value="all">Everything</option>
+          </select>
+        </label>
+        <label class="field">Key terms
+          <select id="terms">
+            <option value="off">Off</option>
+            <option value="tricky">Only advanced ones</option>
+            <option value="standard">Standard</option>
+            <option value="all">Everything</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint" id="settingsStatus">Students can still show fewer on their own phone. Turning both off saves most of the running cost.</p>
+    </div>
+    <div class="group">
+      <span class="group-label">Replay a lecture (no AI cost)</span>
+      <div class="row">
+        <button class="btn" id="replayMock">Demo lecture</button>
+        <select id="sessions" aria-label="Saved lectures"><option value="">Saved lectures…</option></select>
         <button class="btn" id="replaySession">Replay</button>
         <button class="btn" id="replayStop">Stop</button>
       </div>
@@ -197,21 +280,37 @@
     <div class="group">
       <span class="group-label">This lecture</span>
       <div class="row">
-        <button class="btn" id="save">Save session</button>
-        <button class="btn danger" id="reset">Reset lecture</button>
+        <button class="btn" id="save">Save now</button>
+        <button class="btn danger" id="reset">Clear for everyone</button>
       </div>
+      <p class="hint" id="lectureStatus">End lecture saves automatically.</p>
     </div>
-    <div class="status" id="lectureStatus" role="status"></div>
-  </section>
+  </details>
+  </div>
 
   <section class="card" id="previewCard" aria-labelledby="previewTitle">
     <div class="card-head">
-      <h2 id="previewTitle">What students receive</h2>
-      <p class="hint">Live feed preview</p>
+      <h2 id="previewTitle">What students see</h2>
+      <p class="hint">Live preview</p>
     </div>
-    <iframe src="viewer.html" title="Live feed preview"></iframe>
+    <iframe src="viewer.html?preview=1" title="What students see"></iframe>
   </section>
 </main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="joinDialog" aria-labelledby="joinTitle">
+  <h2 id="joinTitle">Join the lecture</h2>
+  <p class="hint">Students scan this with their phone camera.</p>
+  <div id="qr"></div>
+  <a id="joinUrl" target="_blank" rel="noopener"></a>
+  <p class="warn" id="joinWarn" hidden>This address only works on this computer. Open the teacher console through the tunnel (https) address so students' phones can reach it.</p>
+  <div class="row" style="justify-content:center">
+    <button class="btn" id="copyJoin">Copy link</button>
+    <button class="btn primary" id="closeJoin">Done</button>
+  </div>
+</dialog>
+
 <script src="teach.js"></script>
 </body>
 </html>
