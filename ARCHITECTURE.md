@@ -54,7 +54,8 @@ There are four kinds of event (the same contract the Lovable app uses):
 |---|---|
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
 | `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
-| `board` | The whole cleaned-up whiteboard at that moment: text blocks and LaTeX equations, plus a link to the photo. |
+| `board` | The whole cleaned-up whiteboard at that moment, plus a link to the photo. Each line: `content` (LaTeX for equations; words with any maths in `$…$` for text), `plain` (readable Unicode) and `spoken` (words for screen readers). |
+| `focus` | Which mind map topic the teacher is talking about right now (`topicId`). Only sent when it changes; the log keeps just the latest one. |
 | `mindmap` | The whole mind map: `title` (the main subject), `topics` (each with a `relatedness` score 0–1, `details` and `links` to other topics), and the same map as a Markdown outline (`markdown`) for simple tree views. |
 
 The server keeps every event in order. When a phone connects, it first receives every past
@@ -96,6 +97,19 @@ app uses this to place topics: core topics near the centre, tangents near the ed
 next to each other. **We compute the scores (understanding the lecture); Person 2's app does the
 placement (drawing).** Tested: core topic 0.8, a historical aside and a sports application 0.5,
 an unrelated aside about octopuses 0.1.
+
+**"You are here" (focus):** the server also tracks which topic the teacher is on right now, so
+the student app can put a dot on it. Two sources, both in `mindmap.ts`:
+1. Each mind map update also returns `current`: the topic the new speech ended on.
+2. Between updates, every ~10 s of new speech (at least 6 words), a small call sends the topic
+   list plus the last few sentences and asks which topic they're about. This catches the teacher
+   jumping back to an earlier idea, which adds nothing new to the map. "None of these" keeps the
+   dot where it was, so small talk doesn't make it jump.
+
+A `focus` event goes out only when the topic changes. Tested with real calls: the focus followed
+the speaker from Discriminant to an unrelated aside and back; a seven-word remark about "those
+old clay tablets" moved it to Babylonian history without a mind map update. Cost: each check is
+~500 input tokens (≈ $0.003), at most a few a minute and only while someone is talking.
 
 ### 5. Explanation settings: two layers (`settings.ts`)
 
@@ -174,6 +188,8 @@ Each row is something you can point to in the code and explain.
 |---|---|---|
 | Board read as an edit, not from scratch | Claude sees the current copy and updates it, so unchanged writing keeps its wording and ids, and parts blocked by the teacher's body are kept | `board.ts` prompt |
 | Never guess | Claude is told to leave out writing it can't read | `board.ts` prompt |
+| Readable maths, guaranteed | Claude marks maths inside text lines with `$…$`. The server checks every LaTeX string with KaTeX 0.19.1 (the student app's exact version): broken LaTeX or stray `x^2` in prose becomes readable Unicode (x²) instead of raw source or a red error, and a text line that's only maths is promoted to a rendered equation | `mathText.ts` |
+| Maths for every reader | Each board line also gets `plain` (x = (−b ± √(b² − 4ac)) / 2a) for fallbacks, copying and the mind map, and `spoken` ("x equals start fraction minus b plus minus square root of…", from KaTeX's accessibility helper) for screen readers and read-aloud. Computed on the server, so it's free and identical for every phone | `mathText.ts` |
 | Source always available | Each board event links the original photo, so students can check the AI's transcription | `board.ts` `snapshotUrl` |
 | Explanations verified | An annotation is kept only if its phrase really appears in the caption, using the caption's own spelling, so the app can always underline it | `annotate.ts` |
 | Context for sarcasm | The last 3 sentences go along with each new one, since sarcasm depends on context | `annotate.ts` |
@@ -272,6 +288,7 @@ server/
   src/annotate.ts   Idioms, sarcasm, key terms (with a 1–3 confusion level)
   src/settings.ts   Teacher's explanation settings (off / tricky / standard / all)
   src/board.ts      Whiteboard photo → text + LaTeX
+  src/mathText.ts   Validates LaTeX, converts to readable Unicode and spoken words
   src/mindmap.ts    Incremental mind map outline
   src/replay.ts     Play a saved event list with original timing
   src/config.ts     Settings and API keys from wie_hack/.env
@@ -393,6 +410,16 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** Readable board maths: `$…$` inline maths in text lines, server-side KaTeX
+  validation with Unicode fallback, `plain` and `spoken` on every board line, mind map fed with
+  `plain`. Verified on real images ("Discriminant: $b^2 - 4ac$" → plain "b² − 4ac") and edge cases
+  (broken LaTeX, stray `x^2` in prose, all-maths text lines, hyphens left alone). Lovable prompt 4.
+
+- **2026-11-07:** "You are here" tracking: new `focus` event (latest kept in the log), set by
+  each mind map update's `current` topic and by a cheap check every ~10 s of new speech. Teacher
+  console shows "On the mind map: ●topic"; test viewer shows "● Now: topic". Demo lecture has
+  focus events; Lovable follow-up prompt 3 describes the moving dot.
 
 - **2026-11-07:** Investigated "board photos and mind map don't update": a test session had only
   chatter (nothing for the mind map) and a shared screen showing our own apps (no new board content),

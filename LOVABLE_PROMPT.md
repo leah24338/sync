@@ -171,3 +171,75 @@ Use these only if the first prompt above was already pasted before they were add
 > ```json
 > {"type": "mindmap", "t": 50000, "markdown": "# Quadratic equations\n## Definition\n- Highest power of x is 2\n## Standard form\n- ax² + bx + c = 0\n## Quadratic formula\n- x = (−b ± √(b² − 4ac)) / 2a\n## Discriminant\n- b² − 4ac\n- Negative → no real solutions\n## Babylonian origins\n- Solved ~4,000 years ago\n- Written on clay tablets", "title": "Quadratic equations", "topics": [{"id": "t1", "label": "Definition", "relatedness": 0.9, "details": ["Highest power of x is 2"], "links": []}, {"id": "t2", "label": "Standard form", "relatedness": 0.85, "details": ["ax² + bx + c = 0"], "links": [{"to": "t1", "strength": 0.6}]}, {"id": "t3", "label": "Quadratic formula", "relatedness": 0.9, "details": ["x = (−b ± √(b² − 4ac)) / 2a"], "links": [{"to": "t2", "strength": 0.8}]}, {"id": "t4", "label": "Discriminant", "relatedness": 0.8, "details": ["b² − 4ac", "Negative → no real solutions"], "links": [{"to": "t3", "strength": 0.9}]}, {"id": "t5", "label": "Babylonian origins", "relatedness": 0.3, "details": ["Solved ~4,000 years ago", "Written on clay tablets"], "links": [{"to": "t3", "strength": 0.3}]}]}
 > ```
+
+## 3. "You are here" dot on the mind map (added 2026-11-07)
+
+> The server now also sends **focus** events: which mind map topic the teacher is talking about
+> right now. Add this to the `LectureEvent` union in `src/lib/events.ts`:
+>
+> ```ts
+> | { type: "focus"; t: number; topicId: string } // id of a topic in the latest mindmap event
+> ```
+>
+> Store the latest one in the lecture state (`latestFocus`). On reconnect the server re-sends only
+> the most recent focus event. A focus may arrive before or after the mind map that contains its
+> topic, so look the id up whenever either changes and show nothing if it isn't found.
+>
+> On the radial mind map:
+> - Draw a **"you are here" marker** on the focused topic: a small solid dot in the live/accent
+>   colour sitting on the edge of the topic's bubble, with a soft pulsing halo, and a tiny "Now"
+>   label next to it.
+> - When the focus changes, **animate the dot travelling** from the old topic to the new one
+>   (about 600 ms, eased, passing near the centre), then pulse once on arrival. With
+>   `prefers-reduced-motion`, jump without animation or pulsing.
+> - Give the focused topic's bubble a slightly stronger outline so it reads as "current" even
+>   without the dot.
+> - Above the map show a small chip: "● Now: {topic label}". Tapping it centres the map on that topic.
+> - In the markmap tree fallback (no `topics`), skip the dot.
+> - Accessibility: put the "Now: {label}" text in an `aria-live="polite"` region so screen readers
+>   hear when the lecture moves to a new topic.
+>
+> Add these to the mock lecture right after each mind map event so the dot moves in mock mode:
+>
+> ```json
+> {"type":"focus","t":11500,"topicId":"t1"}
+> {"type":"focus","t":31500,"topicId":"t3"}
+> {"type":"focus","t":43500,"topicId":"t4"}
+> {"type":"focus","t":50500,"topicId":"t5"}
+> ```
+
+## 4. Readable maths on the board (added 2026-11-07)
+
+> Board blocks now carry readable versions of their maths. Update the block type in
+> `src/lib/events.ts`:
+>
+> ```ts
+> blocks: { id: string; kind: "text" | "equation";
+>           content: string;  // equation: LaTeX. text: words, with any maths inside $…$
+>           plain: string;    // readable Unicode, e.g. "x = (−b ± √(b² − 4ac)) / 2a"
+>           spoken: string;   // words for screen readers, e.g. "x, equals, start fraction, minus, b, …"
+>         }[]
+> ```
+>
+> The server guarantees every LaTeX string renders with KaTeX 0.19.1 and never sends stray
+> `^`, `_` or backslash commands in text. Make the board easy to read:
+> - **Text blocks with maths:** split `content` on `$…$` (ignore an escaped `\$`) and render each maths
+>   part inline with KaTeX (`displayMode: false`); everything else is plain text. Never show the
+>   `$` signs or raw LaTeX anywhere: Feed, Board tab, enlarged view or bullets.
+> - **The condensed bullets** ("first 6 words…" summaries) must never cut inside a `$…$` part:
+>   count words from `plain`, and when you shorten a line, show the start of `plain` instead.
+> - **Equation blocks:** render with KaTeX `displayMode: true` inside a try/catch with
+>   `throwOnError: true`; if it fails, show `plain` as text (no red error text). Make equations
+>   clearly bigger than body text (scale with the reader's text-size setting), give them generous
+>   line height, and let wide ones scroll sideways with a soft fade at the edge instead of shrinking.
+> - **Accessibility:** use `spoken` as the `aria-label` of every board line (not the LaTeX). Read-aloud
+>   should speak `spoken` for board lines.
+> - **Copy:** a small "Copy" action on equations copies `plain`.
+> - **High contrast theme:** equations use the full foreground colour.
+> - Older events without `plain`/`spoken` (mock data from before): fall back to `content`.
+>
+> Replace the board events in the mock lecture with this shape. Example (the second board):
+>
+> ```json
+> {"type": "board", "id": "b2", "t": 28000, "snapshotUrl": "/placeholder.svg", "blocks": [{"id": "k1", "kind": "text", "content": "Standard form", "plain": "Standard form", "spoken": "Standard form"}, {"id": "k2", "kind": "equation", "content": "ax^2 + bx + c = 0", "plain": "ax² + bx + c = 0", "spoken": "a, x, squared, plus, b, x, plus, c, equals, 0"}, {"id": "k3", "kind": "text", "content": "Quadratic formula", "plain": "Quadratic formula", "spoken": "Quadratic formula"}, {"id": "k4", "kind": "equation", "content": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}", "plain": "x = (−b ± √(b² − 4ac)) / 2a", "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"}, {"id": "k5", "kind": "text", "content": "Works whenever $a \\neq 0$", "plain": "Works whenever a ≠ 0", "spoken": "Works whenever a, does not equal, 0"}]}
+> ```

@@ -18,6 +18,8 @@ export const config = {
   deepgramModel: process.env.DEEPGRAM_MODEL ?? "nova-3",
   claudeModel: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
   mindmapIntervalMs: Number(process.env.MINDMAP_INTERVAL_MS ?? 45_000),
+  // How often to check which mind map topic the teacher is on (only when there's new speech).
+  focusIntervalMs: Number(process.env.FOCUS_INTERVAL_MS ?? 10_000),
   // Optional: when set, teacher controls (mic, board, reset, replay) require ?key=<value>.
   teacherKey: process.env.TEACHER_KEY || undefined,
   publicDir: path.join(serverDir, "public"),

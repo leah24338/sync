@@ -1,5 +1,9 @@
 // The shared contract between the server and the student app (same shape as LOVABLE_PROMPT.md).
-export type BoardBlock = { id: string; kind: "text" | "equation"; content: string };
+/**
+ * One line of the board. `content`: LaTeX for equations; for text, words with any maths inside
+ * `$…$`. `plain`: readable Unicode (x² + 1). `spoken`: words, for screen readers and read-aloud.
+ */
+export type BoardBlock = { id: string; kind: "text" | "equation"; content: string; plain: string; spoken: string };
 
 export type CaptionEvent = { type: "caption"; id: string; t: number; text: string; final: boolean };
 export type AnnotationEvent = {
@@ -24,7 +28,10 @@ export type MindmapTopic = {
 /** `markdown` is the same map as an outline (for simple tree views); `title` + `topics` carry relatedness. */
 export type MindmapEvent = { type: "mindmap"; t: number; markdown: string; title?: string; topics?: MindmapTopic[] };
 
-export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent;
+/** Which mind map topic the teacher is talking about right now (an id from the latest mind map). */
+export type FocusEvent = { type: "focus"; t: number; topicId: string };
+
+export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent | FocusEvent;
 
 type Listener = (event: LectureEvent) => void;
 
@@ -32,13 +39,14 @@ type Listener = (event: LectureEvent) => void;
  * Append-only log of everything that happened in the lecture, and the single source of truth
  * for every student. New students get the whole log, then live updates.
  *
- * Captions are the one exception to append-only: a partial caption is replaced in place when
- * its next version (or the final one) arrives, so ~1 update per second of speech doesn't
- * bloat the log or the catch-up a reconnecting phone has to download.
+ * Two exceptions to append-only keep the catch-up small: a partial caption is replaced in place
+ * when its next version (or the final one) arrives, and there's only ever one focus event (the
+ * latest), since a phone joining late only needs to know where the lecture is now.
  */
 export class EventLog {
   private events: LectureEvent[] = [];
   private captionSlots = new Map<string, number>();
+  private focusSlot: number | null = null;
   private listeners = new Set<Listener>();
   private startedAt = Date.now();
   private idCounter = 0;
@@ -60,6 +68,13 @@ export class EventLog {
         this.events.push(event);
       } else {
         this.events[slot] = event;
+      }
+    } else if (event.type === "focus") {
+      if (this.focusSlot === null) {
+        this.focusSlot = this.events.length;
+        this.events.push(event);
+      } else {
+        this.events[this.focusSlot] = event;
       }
     } else {
       this.events.push(event);
@@ -84,6 +99,7 @@ export class EventLog {
   reset(): void {
     this.events = [];
     this.captionSlots.clear();
+    this.focusSlot = null;
     this.startedAt = Date.now();
     this.idCounter = 0;
   }
