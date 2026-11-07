@@ -39,7 +39,9 @@ export type LostHighlight = { source: "feed" | "board"; sourceId: string; text: 
 /**
  * A student pressed "I'm lost" (anonymous). `t`: the lecture moment they were lost at;
  * `at`: when they pressed it; `topicId`: mind map topic (if known); `captionId`: what was being
- * said at `t` (if known); `highlights`: the exact words they marked, checked against the source.
+ * said at `t` (if known); `highlights`: the exact words they marked, checked against the source;
+ * `student`: an anonymous token, the same for one phone within one lecture, so screens can count
+ * students rather than presses (it can't be traced back to the phone and changes every lecture).
  */
 export type LostEvent = {
   type: "lost";
@@ -48,9 +50,17 @@ export type LostEvent = {
   topicId?: string;
   captionId?: string;
   highlights?: LostHighlight[];
+  student?: string;
 };
 
-export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent | FocusEvent | LostEvent;
+/**
+ * The teacher has gone over what students were lost on: presses before `t` on that topic stop
+ * counting as "lost right now". `topicId`: that topic; `moment`: a 30-second slice of the lecture
+ * (for presses with no topic); neither: everything.
+ */
+export type AddressedEvent = { type: "addressed"; t: number; topicId?: string; moment?: number };
+
+export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent | FocusEvent | LostEvent | AddressedEvent;
 
 type Listener = (event: LectureEvent) => void;
 

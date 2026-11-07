@@ -9,28 +9,29 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    /* Colours follow the student app's "SYNC." palette (web/src/styles.css): warm cream paper,
-       burgundy ink, lavender and blush accents. The console uses them with lighter lines and
-       quieter surfaces so it reads as a professional tool. */
+    /* Colours follow the student app's default "green" look (web/src/styles.css, data-aesthetic="green"):
+       cream paper, brown ink, sage header on grid paper, highlighter-yellow buttons. */
     :root {
-      --bg: oklch(0.965 0.018 85); --card: oklch(0.992 0.008 85); --ink: oklch(0.27 0.06 30); --muted: oklch(0.47 0.04 35);
-      --line: oklch(0.32 0.08 28 / 0.14); --line-strong: oklch(0.32 0.08 28 / 0.28); --soft: oklch(0.935 0.025 85);
-      --accent: oklch(0.32 0.08 28); --accent-ink: oklch(0.97 0.02 85); --accent-soft: oklch(0.85 0.05 265 / 0.45);
-      --live: oklch(0.47 0.16 25); --live-ink: oklch(0.99 0.01 85); --live-soft: oklch(0.86 0.05 10 / 0.55);
-      --ok: oklch(0.46 0.1 145); --ok-soft: oklch(0.78 0.11 110 / 0.28); --warn-soft: oklch(0.9 0.07 80 / 0.6); --warn: oklch(0.45 0.09 70);
-      --radius: 12px; --shadow: 0 1px 2px oklch(0.27 0.06 30 / 0.05), 0 10px 30px -12px oklch(0.27 0.06 30 / 0.12);
-      --brand-gradient: linear-gradient(100deg, oklch(0.32 0.08 28), oklch(0.47 0.14 25));
+      --bg: oklch(0.98 0.012 100); --card: oklch(0.995 0.006 100); --ink: oklch(0.3 0.035 65); --muted: oklch(0.48 0.025 65);
+      --line: oklch(0.86 0.024 100); --line-strong: oklch(0.78 0.03 100); --soft: oklch(0.95 0.015 100); --header: oklch(0.92 0.035 135);
+      --accent: oklch(0.42 0.1 140); --accent-soft: oklch(0.94 0.055 103);
+      --primary: oklch(0.91 0.18 103); --primary-ink: oklch(0.29 0.05 55);
+      --live: oklch(0.5 0.16 25); --live-ink: oklch(0.97 0.02 85); --live-soft: oklch(0.92 0.05 25);
+      --ok: oklch(0.42 0.1 140); --ok-soft: oklch(0.92 0.035 135); --warn-soft: oklch(0.93 0.08 85); --warn: oklch(0.45 0.09 70);
+      --radius: 8px; --shadow: 3px 4px 0 oklch(0.29 0.05 55 / 0.08);
+      --paper-shadow: 3px 4px 0 oklch(0.29 0.05 55 / 0.15);
       --serif: "Playfair Display", Georgia, serif;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: oklch(0.19 0.012 250); --card: oklch(0.225 0.014 250); --ink: oklch(0.93 0.008 85); --muted: oklch(0.74 0.015 250);
-        --line: oklch(0.36 0.014 250); --line-strong: oklch(0.45 0.014 250); --soft: oklch(0.27 0.014 250);
-        --accent: oklch(0.78 0.1 200); --accent-ink: oklch(0.18 0.02 250); --accent-soft: oklch(0.3 0.03 200);
+    /* Dark only when asked for (?dark), like the student app which stays light unless its setting is changed. */
+    @media all {
+      :root.dark {
+        --bg: oklch(0.19 0.012 250); --card: oklch(0.23 0.014 250); --ink: oklch(0.93 0.008 85); --muted: oklch(0.74 0.015 250);
+        --line: oklch(0.33 0.014 250); --line-strong: oklch(0.45 0.014 250); --soft: oklch(0.28 0.014 250); --header: oklch(0.23 0.014 250);
+        --accent: oklch(0.78 0.1 200); --accent-soft: oklch(0.3 0.03 200);
+        --primary: oklch(0.78 0.1 200); --primary-ink: oklch(0.18 0.02 250);
         --live: oklch(0.72 0.15 25); --live-ink: oklch(0.18 0.02 250); --live-soft: oklch(0.32 0.05 25);
         --ok: oklch(0.75 0.15 150); --ok-soft: oklch(0.3 0.05 150); --warn-soft: oklch(0.32 0.05 75); --warn: oklch(0.85 0.1 80);
-        --shadow: none;
-        --brand-gradient: linear-gradient(100deg, oklch(0.78 0.1 200), oklch(0.72 0.12 250));
+        --shadow: none; --paper-shadow: none;
       }
     }
     * { box-sizing: border-box; }
@@ -46,15 +47,18 @@
 
     /* Top bar */
     .topbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px;
-      padding: 12px 24px; background: color-mix(in oklab, var(--bg) 92%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
-    .topbar::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--brand-gradient); }
+      padding: 12px 24px; background: var(--header); border-bottom: 1px solid var(--line); isolation: isolate; }
+    .topbar::before { content: ""; position: absolute; inset: 0; z-index: -1; background: url("green-grid-paper.jpg") center / cover; opacity: .25; pointer-events: none; }
+    :root.dark .topbar::before { display: none; }
     .brand { display: flex; align-items: center; gap: 14px; margin-right: auto; }
     .wordmark { font-family: Helvetica, "Helvetica Neue", "Nimbus Sans", Arial, sans-serif; font-weight: 900; font-style: italic;
-      font-size: 30px; line-height: 1; letter-spacing: -0.02em; color: var(--accent); }
-    .wordmark .dot { color: var(--live); }
+      font-size: 30px; line-height: 1; letter-spacing: 0; padding: 6px 10px; background: var(--primary); color: var(--primary-ink); transform: rotate(-2deg); box-shadow: var(--paper-shadow); }
     .brand-sub { padding-left: 14px; border-left: 1px solid var(--line-strong); font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); line-height: 1.3; }
     .brand-sub strong { display: block; font-family: var(--serif); font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--ink); }
-    #serverStatus { display: flex; flex-wrap: wrap; gap: 6px; }
+    #serverStatus:empty { display: none; }
+    .lost-pill { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--soft); color: var(--muted); font-weight: 700; cursor: pointer; }
+    .lost-pill b { font-family: var(--serif); font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+    .lost-pill.on { background: var(--live); border-color: var(--live); color: var(--live-ink); }
     .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--soft); color: var(--muted); border: 1px solid var(--line); }
     .chip.ok { background: var(--ok-soft); color: var(--ok); }
     .chip.bad { background: var(--live-soft); color: var(--live); }
@@ -62,16 +66,14 @@
 
     /* Layout */
     main { max-width: 1320px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; align-items: start;
-      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-      grid-template-areas: "control control" "left preview"; }
-    #controlCard { grid-area: control; }
-    .left { grid-area: left; display: grid; gap: 16px; }
-    #previewCard { grid-area: preview; position: sticky; top: 70px; }
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+    /* Two independent columns: running the lecture on the left, students on the right. */
+    .left, .right { display: grid; gap: 16px; align-content: start; }
     @media (max-width: 920px) {
-      main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "control" "cam" "preview" "tools"; padding: 12px; }
-      .left { display: contents; }
-      #camCard { grid-area: cam; } #toolsCard { grid-area: tools; }
-      #previewCard { position: static; }
+      main { grid-template-columns: minmax(0, 1fr); grid-template-areas: "control" "lost" "cam" "preview" "tools"; padding: 12px; }
+      .left, .right { display: contents; }
+      #controlCard { grid-area: control; } #lostCard { grid-area: lost; } #camCard { grid-area: cam; }
+      #previewCard { grid-area: preview; } #toolsCard { grid-area: tools; }
     }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: var(--shadow); }
     .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
@@ -85,11 +87,11 @@
     kbd { font: 600 11px/1 ui-monospace, Menlo, monospace; padding: 3px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; background: var(--soft); }
 
     /* Buttons */
-    .btn { min-height: 44px; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--card); cursor: pointer; font-weight: 700; transition: background-color .15s, border-color .15s; }
+    .btn { min-height: 44px; padding: 10px 18px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--card); cursor: pointer; font-weight: 700; transition: background-color .15s, border-color .15s; }
     .btn:hover:not(:disabled) { background: var(--soft); }
     .btn:disabled { opacity: .45; cursor: not-allowed; }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-    .btn.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--accent) 86%, black); }
+    .btn.primary { background: var(--primary); border-color: color-mix(in oklab, var(--primary) 70%, var(--primary-ink)); color: var(--primary-ink); box-shadow: var(--paper-shadow); }
+    .btn.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--primary) 88%, var(--primary-ink)); }
     .btn.huge { min-height: 58px; padding: 14px 30px; font-size: 17px; border-radius: 12px; letter-spacing: .01em; }
     .btn.end { background: var(--live); border-color: var(--live); color: var(--live-ink); }
     .btn.end:hover { background: color-mix(in oklab, var(--live) 86%, black); }
@@ -141,7 +143,7 @@
     .segmented { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--soft); gap: 2px; }
     .segmented label { position: relative; display: inline-flex; align-items: center; min-height: 36px; padding: 6px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; }
     .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-    .segmented label:has(input:checked) { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px oklch(0.27 0.06 30 / 0.15), 0 0 0 1px var(--line); }
+    .segmented label:has(input:checked) { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px oklch(0.29 0.05 55 / 0.15), 0 0 0 1px var(--line); }
     .segmented label:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 1px; }
     #sourceHint { margin: -6px 0 12px; }
 
@@ -155,23 +157,31 @@
     @media (prefers-reduced-motion: reduce) { .flash.go, .badge::before { animation: none; } }
     #capture { flex: 1; min-width: 200px; }
     #meter { display: block; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); margin-top: 8px; }
-    #meter:empty { display: none; }
+    #meter:empty, body:not(.debug) #meter { display: none; }
 
-    /* Students lost */
-    .lost-total { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
-    #lostTotal { font-family: var(--serif); font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-    #lostCard.alert #lostTotal { color: var(--live); }
-    .lost-list { display: grid; gap: 10px; }
-    .lost-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; font-size: 14px; }
-    .lost-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .lost-row .count { font-weight: 700; font-variant-numeric: tabular-nums; }
-    .lost-row .bar { grid-column: 1 / -1; height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; }
-    .lost-row .bar span { display: block; height: 100%; background: var(--live); border-radius: inherit; }
-    .lost-row.now strong::after { content: " · now"; color: var(--accent); font-weight: 600; }
-    .lost-section { margin-top: 16px; display: grid; gap: 8px; }
-    .moments .where { color: var(--muted); font-size: 12px; }
-    .moments { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
-    .moments .when { font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* Students lost: one big number, then where they're lost */
+    .lost-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .lost-head h2 { font-size: 19px; margin: 0; }
+    .lost-big { display: flex; align-items: baseline; gap: 12px; margin: 14px 0 10px; }
+    #lostTotal { font-family: var(--serif); font-size: 72px; font-weight: 700; line-height: .9; font-variant-numeric: tabular-nums; color: var(--ok); }
+    #lostCard[data-level="some"] #lostTotal, #lostCard[data-level="many"] #lostTotal { color: var(--live); }
+    #lostTotalLabel { font-size: 16px; font-weight: 600; }
+    .lost-meter { height: 10px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+    .lost-meter span { display: block; height: 100%; width: 0; background: var(--live); border-radius: inherit; transition: width .4s; }
+    #lostAdvice { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+    #lostCard[data-level="many"] #lostAdvice { background: var(--live-soft); color: var(--live); font-weight: 700; padding: 10px 12px; border-radius: 10px; }
+    #lostCard.ping { animation: lostflash 1.2s ease-out; }
+    @keyframes lostflash { 0% { box-shadow: 0 0 0 4px var(--live); } 100% { box-shadow: var(--shadow); } }
+    .lost-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 0; max-height: 330px; overflow-y: auto; overscroll-behavior: contain; }
+    .lost-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+    .lost-row .topic { font-weight: 700; font-size: 16px; min-width: 0; overflow-wrap: anywhere; }
+    .lost-row .tag { margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
+    .lost-row .n { font-family: var(--serif); font-size: 26px; font-weight: 700; line-height: 1; color: var(--live); font-variant-numeric: tabular-nums; text-align: right; }
+    .lost-row .n small { display: block; font-family: "Atkinson Hyperlegible", system-ui, sans-serif; font-size: 11px; font-weight: 700; color: var(--muted); }
+    .lost-row .detail { grid-column: 1; display: flex; flex-wrap: wrap; gap: 6px; font-size: 13px; color: var(--muted); }
+    .lost-row .word { padding: 2px 9px; border-radius: 8px; background: var(--live-soft); color: var(--ink); font-weight: 600; }
+    .lost-row .done { grid-column: 2; grid-row: 2; min-height: 36px; padding: 6px 12px; font-size: 13px; }
+    @media (prefers-reduced-motion: reduce) { #lostCard.ping { animation: none; } .lost-meter span { transition: none; } }
 
     /* Preview */
     #previewCard iframe { width: 100%; height: min(72vh, 720px); min-height: 460px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
@@ -208,10 +218,12 @@
     <h1 class="brand-sub">Teacher<strong>Lecture console</strong></h1>
   </div>
   <div id="serverStatus" aria-label="System status"></div>
+  <button class="lost-pill" id="lostPill" aria-label="Students lost right now"><b id="lostPillCount">0</b> lost</button>
   <button class="btn ghost" id="joinBtn">Show join code</button>
 </header>
 
 <main>
+  <div class="left">
   <!-- One place to run the lecture -->
   <section class="card control" id="controlCard" aria-label="Lecture">
     <div>
@@ -252,7 +264,6 @@
     <div class="wide status" id="micStatus" role="status"></div>
   </section>
 
-  <div class="left">
   <section class="card" id="camCard" aria-labelledby="camTitle">
     <div class="card-head">
       <h2 id="camTitle">Board</h2>
@@ -276,24 +287,6 @@
     </div>
     <code id="meter"></code>
     <div class="status" id="boardStatus" role="status">On a phone, open this page through the https address so the camera works.</div>
-  </section>
-
-  <section class="card" id="lostCard" aria-labelledby="lostTitle">
-    <div class="card-head">
-      <h2 id="lostTitle">Students lost</h2>
-      <p class="hint">Anonymous · last 10 minutes</p>
-    </div>
-    <div class="lost-total"><span id="lostTotal">0</span><span class="muted" id="lostTotalLabel">students have pressed "I'm lost"</span></div>
-    <p class="hint" id="lostEmpty">When students press "I'm lost", you'll see which topics and moments confused them.</p>
-    <div id="lostTopics" class="lost-list" aria-label="Lost by topic"></div>
-    <div id="lostWordsWrap" class="lost-section" hidden>
-      <span class="group-label">Words students highlighted</span>
-      <ol id="lostWords" class="moments"></ol>
-    </div>
-    <div id="lostMomentsWrap" class="lost-section" hidden>
-      <span class="group-label">Most confusing moments</span>
-      <ol id="lostMoments" class="moments"></ol>
-    </div>
   </section>
 
   <details class="card tools" id="toolsCard">
@@ -340,6 +333,21 @@
   </details>
   </div>
 
+  <div class="right">
+  <section class="card" id="lostCard" aria-labelledby="lostTitle" data-level="none">
+    <div class="lost-head">
+      <h2 id="lostTitle">Students lost</h2>
+      <button class="btn ghost" id="lostClear" hidden>Clear all</button>
+    </div>
+    <div class="lost-big" role="status" aria-live="polite">
+      <span id="lostTotal">0</span>
+      <span id="lostTotalLabel">No one is lost right now</span>
+    </div>
+    <div class="lost-meter" aria-hidden="true"><span id="lostMeter"></span></div>
+    <p id="lostAdvice">Students press "I'm lost" on their phones. It's anonymous.</p>
+    <ul id="lostTopics" class="lost-list" aria-label="Where students are lost"></ul>
+  </section>
+
   <section class="card" id="previewCard" aria-labelledby="previewTitle">
     <div class="card-head">
       <h2 id="previewTitle">What students see</h2>
@@ -347,6 +355,7 @@
     </div>
     <iframe src="viewer.html?preview=1" title="What students see"></iframe>
   </section>
+  </div>
 </main>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

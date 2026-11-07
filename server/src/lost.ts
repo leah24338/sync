@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import * as z from "zod/v4";
 import type { EventLog, LectureEvent, LostHighlight } from "./events.js";
 
@@ -14,8 +15,11 @@ const LostRequest = z.object({
 const BURST = 3; // a phone may send up to 3 flags…
 const BURST_WINDOW_MS = 10_000; // …in any 10 seconds
 const REPEAT_WINDOW_MS = 2 * 60_000; // the same phone flagging the same thing again within 2 min is ignored
-const COUNT_WINDOW_MS = 10 * 60_000; // "N students lost here" counts the last 10 minutes
+// A student counts as "lost right now" for 5 minutes after pressing, or until the teacher marks
+// that topic addressed. The teacher console uses the same window.
+export const ACTIVE_MS = 5 * 60_000;
 const MAX_HIGHLIGHTS = 5;
+const MOMENT_MS = 30_000;
 
 export type LostResult =
   | { ok: true; duplicate: boolean; t: number; topicId?: string; highlights: LostHighlight[]; students: number }
@@ -28,19 +32,23 @@ const normalize = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim
  * count; nothing identifying is stored or broadcast. Highlighted words are only accepted if they
  * really appear in the caption or board line they claim to come from, so the teacher's screen
  * can't be used for free-text messages. Flags missing a topic get the topic the teacher was on at
- * that moment (from the focus history).
+ * that moment (from the focus history). Each flag carries a `student` token (a salted hash of the
+ * phone's id, new salt every lecture) so screens can count students, not presses.
  */
 export class LostTracker {
   private focusHistory: { t: number; topicId: string }[] = [];
   private flagTimes = new Map<string, number[]>();
   private flagged = new Map<string, { at: number; key: string }[]>();
   private recent: { at: number; topicKey: string; clientId: string }[] = [];
+  private addressedAt = new Map<string, number>(); // topic key ("*" = everything) → when
+  private salt = randomBytes(16);
 
   constructor(private log: EventLog) {}
 
   /** Called for every event so the tracker knows where the lecture was at any moment. */
   observe(event: LectureEvent): void {
     if (event.type === "focus") this.focusHistory.push({ t: event.t, topicId: event.topicId });
+    if (event.type === "addressed") this.addressedAt.set(addressedKey(event), event.t);
   }
 
   flag(body: unknown): LostResult {
@@ -61,7 +69,7 @@ export class LostTracker {
     const t = Math.min(Math.max(0, parsed.data.t ?? earliest ?? now), now);
     const topicId = parsed.data.topicId || this.topicAt(t);
     const captionId = highlights.find((h) => h.source === "feed")?.sourceId ?? this.captionAt(t);
-    const topicKey = topicId ?? `moment-${Math.floor(t / 30_000)}`; // no topic: group by 30 s moment
+    const topicKey = topicId ?? `moment-${Math.floor(t / MOMENT_MS)}`; // no topic: group by 30 s moment
     const key = `${topicKey}|${highlights.map((h) => normalize(h.text)).sort().join("|")}`;
 
     const mine = (this.flagged.get(clientId) ?? []).filter((f) => now - f.at < REPEAT_WINDOW_MS);
@@ -76,14 +84,16 @@ export class LostTracker {
         ...(topicId && { topicId }),
         ...(captionId && { captionId }),
         ...(highlights.length && { highlights }),
+        student: createHash("sha256").update(this.salt).update(clientId).digest("hex").slice(0, 10),
       });
       const words = highlights.length ? ` ("${highlights.map((h) => h.text).join('", "')}")` : "";
       console.log(`[lost] a student is lost${topicId ? ` on ${topicId}` : ""} at ${Math.round(t / 1000)} s${words}`);
     }
     this.flagged.set(clientId, mine);
 
-    this.recent = this.recent.filter((f) => now - f.at < COUNT_WINDOW_MS);
-    const students = new Set(this.recent.filter((f) => f.topicKey === topicKey).map((f) => f.clientId)).size;
+    this.recent = this.recent.filter((f) => now - f.at < ACTIVE_MS);
+    const since = Math.max(this.addressedAt.get(topicKey) ?? -1, this.addressedAt.get("*") ?? -1);
+    const students = new Set(this.recent.filter((f) => f.topicKey === topicKey && f.at > since).map((f) => f.clientId)).size;
     return { ok: true, duplicate, t, topicId, highlights, students };
   }
 
@@ -116,4 +126,10 @@ export class LostTracker {
     for (const e of this.log.all()) if (e.type === "caption" && e.final && e.t <= t) id = e.id;
     return id;
   }
+}
+
+/** The key an addressed event clears: a topic, a 30-second moment, or "*" for everything. */
+export function addressedKey(event: { topicId?: string; moment?: number }): string {
+  if (event.topicId) return event.topicId;
+  return event.moment !== undefined ? `moment-${event.moment}` : "*";
 }
