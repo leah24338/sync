@@ -69,6 +69,7 @@ export class CatchUpWriter {
       label: "catch-up",
       schema: CatchUpReply,
       effort: "low",
+      task: "text",
       system: SYSTEM,
       content: [
         ...(highlighted.length ? [`THE STUDENT HIGHLIGHTED THESE WORDS AS CONFUSING: ${highlighted.map((w) => `"${w}"`).join(", ")}`] : []),

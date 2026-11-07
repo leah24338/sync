@@ -66,6 +66,7 @@ export class BoardReader {
       label: "board",
       schema: BoardState,
       effort: "medium",
+      task: "board",
       system: SYSTEM,
       content: [
         { type: "text", text: `CURRENT COPY:\n${JSON.stringify(this.blocks.map(({ id, kind, content }) => ({ id, kind, content })))}` },

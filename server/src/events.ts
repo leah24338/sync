@@ -21,6 +21,8 @@ export type MindmapTopic = {
   label: string;
   /** How closely the topic relates to the lecture's main subject: 1 = core … 0 = unrelated. */
   relatedness: number;
+  /** The topic this one branches off (a case, example or step of it); absent = off the centre. */
+  parentId?: string;
   details: string[];
   /** Other topics this one connects to, with strength 0–1. */
   links: { to: string; strength: number }[];

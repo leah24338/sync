@@ -16,7 +16,10 @@ export const config = {
   anthropicKey: process.env.ANTHROPIC_API_KEY || undefined,
   deepgramKey: process.env.DEEPGRAM_API_KEY || undefined,
   deepgramModel: process.env.DEEPGRAM_MODEL ?? "nova-3",
+  // Reading the board (vision, accuracy matters most) uses the strong model; the high-volume text
+  // tasks (per-sentence notes, mind map, focus, catch-ups, topic notes) use a much cheaper one.
   claudeModel: process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
+  claudeTextModel: process.env.CLAUDE_TEXT_MODEL ?? "claude-haiku-5-5",
   mindmapIntervalMs: Number(process.env.MINDMAP_INTERVAL_MS ?? 45_000),
   // How often to check which mind map topic the teacher is on (only when there's new speech).
   focusIntervalMs: Number(process.env.FOCUS_INTERVAL_MS ?? 10_000),

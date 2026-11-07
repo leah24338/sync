@@ -1,0 +1,465 @@
+{
+ "t1": {
+  "topicId": "t1",
+  "label": "Standard form",
+  "summary": "A quadratic is any equation where the highest power of x is two. Before solving, it is always written in standard form: ax² + bx + c = 0, where a must not be 0. From standard form, it can be solved by factoring, completing the square, or the quadratic formula.",
+  "keyPoints": [
+   "A quadratic has x² as its highest power of x.",
+   "Standard form: ax² + bx + c = 0.",
+   "a must not be 0 (a ≠ 0), or it is not a quadratic.",
+   "Always rewrite in standard form first, before solving.",
+   "Three main methods: factoring, completing the square, quadratic formula."
+  ],
+  "example": "x² + 5x + 6 = 0 is in standard form with a = 1, b = 5, c = 6; it factors as (x + 2)(x + 3), giving roots x = −2 and x = −3.",
+  "formulas": [
+   {
+    "latex": "ax^2 + bx + c = 0",
+    "plain": "ax² + bx + c = 0",
+    "spoken": "a, x, squared, plus, b, x, plus, c, equals, 0"
+   },
+   {
+    "latex": "x^2 + 5x + 6 = (x + 2)(x + 3)",
+    "plain": "x² + 5x + 6 = (x + 2)(x + 3)",
+    "spoken": "x, squared, plus, 5, x, plus, 6, equals, left parenthesis, x, plus, 2, right parenthesis, left parenthesis, x, plus, 3, right parenthesis"
+   },
+   {
+    "latex": "x^2 + 6x + 5 = (x + 3)^2 - 4",
+    "plain": "x² + 6x + 5 = (x + 3)² − 4",
+    "spoken": "x, squared, plus, 6, x, plus, 5, equals, left parenthesis, x, plus, 3, right parenthesis, squared, minus, 4"
+   },
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "a piece of cake",
+    "meaning": "Very easy."
+   }
+  ],
+  "basedOn": {
+   "sentences": 6,
+   "boardLines": 10
+  }
+ },
+ "t2": {
+  "topicId": "t2",
+  "label": "Solving methods",
+  "summary": "Quadratic equations (highest power of x is two) are first written in standard form ax² + bx + c = 0, then solved by one of three main methods. Factoring is quickest when the expression splits nicely, completing the square works even when factoring doesn't, and the quadratic formula always works.",
+  "keyPoints": [
+   "Always write the equation in standard form: ax² + bx + c = 0.",
+   "Factoring: split into two brackets; each bracket set to zero gives a root.",
+   "Completing the square: halve the b term and square it.",
+   "Quadratic formula: x = (−b ± √(b² − 4ac)) / 2a, which always works.",
+   "Discriminant b² − 4ac: > 0 two real roots, = 0 one repeated root, < 0 no real roots.",
+   "Check the discriminant before solving; roots are where the parabola crosses the x-axis."
+  ],
+  "example": "x² + 5x + 6 factors to (x + 2)(x + 3), giving roots x = −2 and x = −3. Completing the square on x² + 6x + 5 gives (x + 3)² − 4.",
+  "formulas": [
+   {
+    "latex": "x^2 + 5x + 6 = (x + 2)(x + 3)",
+    "plain": "x² + 5x + 6 = (x + 2)(x + 3)",
+    "spoken": "x, squared, plus, 5, x, plus, 6, equals, left parenthesis, x, plus, 2, right parenthesis, left parenthesis, x, plus, 3, right parenthesis"
+   },
+   {
+    "latex": "x^2 + 6x + 5 = (x + 3)^2 - 4",
+    "plain": "x² + 6x + 5 = (x + 3)² − 4",
+    "spoken": "x, squared, plus, 6, x, plus, 5, equals, left parenthesis, x, plus, 3, right parenthesis, squared, minus, 4"
+   },
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "quadratic equations",
+    "meaning": "Equations where the highest power of x is 2, like x² + 3x + 2 = 0."
+   },
+   {
+    "phrase": "a piece of cake",
+    "meaning": "Very easy."
+   },
+   {
+    "phrase": "rule of thumb",
+    "meaning": "A general guideline that usually works, not a strict rule."
+   },
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   },
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   }
+  ],
+  "basedOn": {
+   "sentences": 17,
+   "boardLines": 11
+  }
+ },
+ "t3": {
+  "topicId": "t3",
+  "label": "Factoring",
+  "parentLabel": "Solving methods",
+  "summary": "Factoring is the first method for solving quadratics. When the quadratic splits nicely into two brackets, it's the easiest method. Once factored, each bracket gives a root.",
+  "keyPoints": [
+   "Factoring is the first solving method covered.",
+   "Works best when the quadratic splits nicely into two brackets.",
+   "x² + 5x + 6 factors to (x + 2)(x + 3).",
+   "Set each bracket to zero to find the roots.",
+   "If factoring doesn't work, completing the square still does."
+  ],
+  "example": "x² + 5x + 6 = (x + 2)(x + 3), so the roots are x = −2 and x = −3.",
+  "formulas": [
+   {
+    "latex": "x^2 + 5x + 6 = (x + 2)(x + 3)",
+    "plain": "x² + 5x + 6 = (x + 2)(x + 3)",
+    "spoken": "x, squared, plus, 5, x, plus, 6, equals, left parenthesis, x, plus, 2, right parenthesis, left parenthesis, x, plus, 3, right parenthesis"
+   },
+   {
+    "latex": "x^2 + 6x + 5 = (x + 3)^2 - 4",
+    "plain": "x² + 6x + 5 = (x + 3)² − 4",
+    "spoken": "x, squared, plus, 6, x, plus, 5, equals, left parenthesis, x, plus, 3, right parenthesis, squared, minus, 4"
+   },
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "a piece of cake",
+    "meaning": "Very easy."
+   },
+   {
+    "phrase": "rule of thumb",
+    "meaning": "A general guideline that usually works, not a strict rule."
+   }
+  ],
+  "basedOn": {
+   "sentences": 4,
+   "boardLines": 7
+  }
+ },
+ "t4": {
+  "topicId": "t4",
+  "label": "Completing the square",
+  "parentLabel": "Solving methods",
+  "summary": "Completing the square is a method for solving quadratics that works even when factoring doesn't. Starting from standard form ax² + bx + c = 0, you halve the b term and square it to rewrite the expression as a squared bracket plus or minus a number.",
+  "keyPoints": [
+   "First write the quadratic in standard form: ax² + bx + c = 0.",
+   "Rule of thumb: halve the b term, then square it.",
+   "Works even when factoring doesn't.",
+   "Result has the form (x + b/2)² plus or minus a constant."
+  ],
+  "example": "x² + 6x + 5: halve 6 to get 3, square it to get 9, so x² + 6x + 5 = (x + 3)² − 4, giving (x + 3)² − 4 = 0.",
+  "formulas": [
+   {
+    "latex": "x^2 + 6x + 5 = (x + 3)^2 - 4",
+    "plain": "x² + 6x + 5 = (x + 3)² − 4",
+    "spoken": "x, squared, plus, 6, x, plus, 5, equals, left parenthesis, x, plus, 3, right parenthesis, squared, minus, 4"
+   },
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "rule of thumb",
+    "meaning": "A general guideline that usually works, not a strict rule."
+   },
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   }
+  ],
+  "basedOn": {
+   "sentences": 6,
+   "boardLines": 8
+  }
+ },
+ "t5": {
+  "topicId": "t5",
+  "label": "Quadratic formula",
+  "parentLabel": "Solving methods",
+  "summary": "The quadratic formula, x = (−b ± √(b² − 4ac)) / 2a, solves any quadratic written in standard form ax² + bx + c = 0, and it always works. The part under the square root, b² − 4ac, is called the discriminant and tells you how many real roots there are.",
+  "keyPoints": [
+   "Write the equation in standard form ax² + bx + c = 0 first.",
+   "Quadratic formula: x = (−b ± √(b² − 4ac)) / 2a — it always works.",
+   "Discriminant b² − 4ac > 0: two real roots.",
+   "Discriminant = 0: one repeated root; < 0: no real roots.",
+   "Roots are where the parabola crosses the x-axis.",
+   "Always check the discriminant before you start solving."
+  ],
+  "example": "The parabola whose x-axis crossings give the roots is the same shape of curve a basketball follows after a jump shot.",
+  "formulas": [
+   {
+    "latex": "x^2 + 6x + 5 = (x + 3)^2 - 4",
+    "plain": "x² + 6x + 5 = (x + 3)² − 4",
+    "spoken": "x, squared, plus, 6, x, plus, 5, equals, left parenthesis, x, plus, 3, right parenthesis, squared, minus, 4"
+   },
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "quadratic equations",
+    "meaning": "Equations where the highest power of x is 2, like x² + 3x + 2 = 0."
+   },
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   },
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   },
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   }
+  ],
+  "basedOn": {
+   "sentences": 12,
+   "boardLines": 8
+  }
+ },
+ "t6": {
+  "topicId": "t6",
+  "label": "Discriminant",
+  "parentLabel": "Quadratic formula",
+  "summary": "The discriminant is b² − 4ac, the part under the square root in the quadratic formula x = (−b ± √(b² − 4ac)) / 2a. Its sign tells you how many real roots a quadratic in standard form ax² + bx + c = 0 has, so always check it before you start solving.",
+  "keyPoints": [
+   "Discriminant = b² − 4ac, the expression under the square root.",
+   "Write the equation in standard form ax² + bx + c = 0 first.",
+   "Positive discriminant: two real roots.",
+   "Zero discriminant: one repeated root.",
+   "Negative discriminant: no real roots.",
+   "Roots are where the parabola crosses the x-axis."
+  ],
+  "example": "The parabola's shape is the same curve a basketball follows after a jump shot; the roots are where that curve crosses the x-axis.",
+  "formulas": [
+   {
+    "latex": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}",
+    "plain": "x = (−b ± √(b² − 4ac)) / 2a",
+    "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"
+   }
+  ],
+  "terms": [
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   },
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   },
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   }
+  ],
+  "basedOn": {
+   "sentences": 10,
+   "boardLines": 6
+  }
+ },
+ "t7": {
+  "topicId": "t7",
+  "label": "Positive: two roots",
+  "parentLabel": "Discriminant",
+  "summary": "The discriminant is the part under the square root in the quadratic formula: b² − 4ac. When it is positive (b² − 4ac > 0), the quadratic has two real roots. Graphically, this means the parabola crosses the x-axis at two points.",
+  "keyPoints": [
+   "Discriminant = b² − 4ac, the part under the square root.",
+   "If b² − 4ac > 0, there are two real roots.",
+   "Roots are where the parabola crosses the x-axis.",
+   "Positive discriminant: the parabola crosses the x-axis twice.",
+   "Compare: = 0 gives one repeated root; < 0 gives no real roots."
+  ],
+  "example": "",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   },
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   },
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   }
+  ],
+  "basedOn": {
+   "sentences": 5,
+   "boardLines": 4
+  }
+ },
+ "t8": {
+  "topicId": "t8",
+  "label": "Zero: one root",
+  "parentLabel": "Discriminant",
+  "summary": "For a quadratic in standard form ax² + bx + c = 0, the discriminant is b² − 4ac, the part under the square root. When the discriminant is exactly zero, the equation has one repeated root. Graphically, the roots are where the parabola meets the x-axis, so this case gives a single meeting point.",
+  "keyPoints": [
+   "Write the equation in standard form first: ax² + bx + c = 0.",
+   "The discriminant is b² − 4ac, the part under the square root.",
+   "If b² − 4ac = 0, there is one repeated root.",
+   "Compare: positive gives two real roots, negative gives no real roots.",
+   "Roots are where the parabola crosses the x-axis."
+  ],
+  "example": "",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "discriminant",
+    "meaning": "b² − 4ac. Its sign tells you how many real solutions there are."
+   },
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   },
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   }
+  ],
+  "basedOn": {
+   "sentences": 6,
+   "boardLines": 4
+  }
+ },
+ "t9": {
+  "topicId": "t9",
+  "label": "Negative: no real roots",
+  "parentLabel": "Discriminant",
+  "summary": "The discriminant of a quadratic is b² − 4ac. When it is negative (b² − 4ac < 0), the quadratic has no real roots at all. Graphically, roots are where the parabola crosses the x axis, so a negative discriminant means the parabola never crosses it.",
+  "keyPoints": [
+   "Discriminant = b² − 4ac",
+   "If b² − 4ac < 0, there are no real roots",
+   "Roots are where the parabola crosses the x axis",
+   "Negative discriminant: the parabola does not cross the x axis",
+   "Compare: > 0 gives two real roots, = 0 gives one repeated root"
+  ],
+  "example": "The parabola is the same curve a basketball follows after a jump shot; with a negative discriminant, the curve never touches the x axis.",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "Oh great",
+    "meaning": "Said sarcastically: the speaker isn't pleased. A negative discriminant means no real solutions."
+   },
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   }
+  ],
+  "basedOn": {
+   "sentences": 5,
+   "boardLines": 4
+  }
+ },
+ "t10": {
+  "topicId": "t10",
+  "label": "Parabola graphs",
+  "summary": "A quadratic can be drawn as a curve called a parabola. Graphically, the roots of the quadratic are the points where the parabola crosses the x-axis. The same parabola shape also describes real motion, such as the path of a thrown ball.",
+  "keyPoints": [
+   "A quadratic's graph is a parabola.",
+   "Roots are the x-intercepts: where the parabola crosses the x-axis.",
+   "The parabola shape describes projectile motion, like a basketball's flight.",
+   "Babylonian scribes solved quadratics almost 4,000 years ago on clay tablets."
+  ],
+  "example": "A basketball after a jump shot travels along a parabola-shaped path through the air.",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "parabola",
+    "meaning": "The U-shaped curve you get when you graph a quadratic."
+   },
+   {
+    "phrase": "scribes",
+    "meaning": "People whose job was writing and copying records by hand."
+   }
+  ],
+  "basedOn": {
+   "sentences": 4,
+   "boardLines": 0
+  }
+ },
+ "t11": {
+  "topicId": "t11",
+  "label": "Projectile motion",
+  "parentLabel": "Parabola graphs",
+  "summary": "The parabola curve studied in this lecture also describes the path of a thrown object. A basketball flying after a jump shot follows this same parabolic arc.",
+  "keyPoints": [
+   "A projectile's path follows the same parabola curve as these graphs.",
+   "A basketball after a jump shot travels in a parabolic arc.",
+   "Babylonian scribes solved these kinds of problems almost 4,000 years ago, on clay tablets."
+  ],
+  "example": "A basketball released in a jump shot rises and then falls, tracing the same parabola shape as the graph.",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "scribes",
+    "meaning": "People whose job was writing and copying records by hand."
+   }
+  ],
+  "basedOn": {
+   "sentences": 3,
+   "boardLines": 0
+  }
+ },
+ "t12": {
+  "topicId": "t12",
+  "label": "Babylonian origins",
+  "summary": "Babylonian scribes were solving these equations almost four thousand years ago. They recorded their work on clay tablets.",
+  "keyPoints": [
+   "Babylonian scribes solved these equations about 4,000 years ago.",
+   "Their work was written on clay tablets.",
+   "These problems have been studied for thousands of years."
+  ],
+  "example": "",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "scribes",
+    "meaning": "People whose job was writing and copying records by hand."
+   }
+  ],
+  "basedOn": {
+   "sentences": 1,
+   "boardLines": 0
+  }
+ },
+ "t13": {
+  "topicId": "t13",
+  "label": "Octopus hearts",
+  "summary": "As a quick aside, the teacher mentioned that octopuses have three hearts. It was a fun fact unrelated to the main lesson on the discriminant.",
+  "keyPoints": [
+   "Octopuses have three hearts.",
+   "This was an unrelated fun fact, not part of the maths lesson."
+  ],
+  "example": "",
+  "formulas": [],
+  "terms": [
+   {
+    "phrase": "scribes",
+    "meaning": "People whose job was writing and copying records by hand."
+   }
+  ],
+  "basedOn": {
+   "sentences": 3,
+   "boardLines": 0
+  }
+ }
+}
