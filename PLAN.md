@@ -11,7 +11,7 @@
 | MVP scope | Decided, trimmed for two people (below) |
 | Student app | Built in Lovable (TanStack Start), synced to GitHub, runs locally on port 8080 |
 | Server + teacher page | **Built (v1)** in `server/`. Captions, notes, board reading and mind map tested end to end with real keys. How it works and why: `ARCHITECTURE.md` |
-| Runtime AI | Claude Opus 5.5 (`claude-opus-5-5`) called from our server. Lovable's built-in AI is **not** used |
+| Runtime AI | Called from our server: Claude Opus 5.5 (`claude-opus-5-5`) reads the board, Claude Haiku 5.5 (`claude-haiku-5-5`) does the text tasks (~$0.75 per lecture hour instead of ~$4.50). Lovable's built-in AI is **not** used |
 | Speech-to-text | Deepgram streaming (AssemblyAI as backup) |
 | Tunnel | cloudflared quick tunnel (ngrok as backup) |
 | Primary persona | **TODO**: pick one (e.g. first-semester international student, or hard-of-hearing student) |

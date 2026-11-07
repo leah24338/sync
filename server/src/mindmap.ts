@@ -11,6 +11,7 @@ const Changes = z.object({
       id: z.string(),
       label: z.string(),
       relatedness: z.number(),
+      parentId: z.string(),
       details: z.array(z.string()),
       links: z.array(z.object({ to: z.string(), strength: z.number() })),
     }),
@@ -28,12 +29,13 @@ Each topic has:
 - "id": keep existing ids; give new topics new ids (t1, t2, ...).
 - "label": under 8 words.
 - "details": short facts under 8 words each. Write maths in plain text (x² + 1), not LaTeX.
-- "relatedness": how closely the topic relates to the main subject, 0 to 1. The app draws low-relatedness topics further from the centre.
+- "parentId": the id of the topic this one BRANCHES OFF (one of its cases, methods, examples, parts or consequences), or "" if it comes straight off the main subject. Build a real tree: e.g. "Factoring" and "Quadratic formula" branch off "Solving methods"; "Discriminant" branches off "Quadratic formula"; "Negative discriminant" branches off "Discriminant".
+- "relatedness": how closely the topic relates to the main subject, 0 to 1. The app draws low-relatedness topics further out.
     1.0 the main subject itself · 0.7–0.9 a direct part of it · 0.4–0.6 background, an application or a connected idea · 0.1–0.3 a tangent or a different subject
-- "links": other topics it builds on or connects to ("to" is their id), with "strength" 0 to 1. Only link genuinely connected topics.
+- "links": OTHER connections beyond the parent ("to" is their id), with "strength" 0 to 1. Only link genuinely connected topics.
 
 Rules:
-- Put each new detail under the topic it belongs to; create a topic only for something new.
+- Put each new detail under the topic it belongs to; create a topic only for something new. Prefer a branch under an existing topic over a new top-level topic when it's a part of that topic.
 - If the teacher moves on to something unrelated, add it as its own topic with low relatedness instead of forcing it under an existing one.
 - Ignore filler, jokes and classroom logistics.
 - If nothing new is worth adding, return the current title and an empty topics list (still fill in "current").`;
@@ -116,6 +118,7 @@ export class MindMapper {
         label: "focus",
         schema: Focus,
         effort: "low",
+        task: "text",
         system: FOCUS_SYSTEM,
         content: `TOPICS:\n${topics.join("\n")}\n\nWHAT THE TEACHER JUST SAID:\n${this.recent.join("\n")}`,
       });
@@ -136,6 +139,7 @@ export class MindMapper {
         label: "mindmap",
         schema: Changes,
         effort: "low",
+        task: "text",
         system: SYSTEM,
         content: `CURRENT MAP:\n${this.map.topics.length ? JSON.stringify(this.map) : "(empty: start a new one)"}\n\nNEW TRANSCRIPT:\n${newText}`,
       });
@@ -173,6 +177,8 @@ function merge(current: MindMap, changes: z.infer<typeof Changes>): MindMap {
     if (!topic) {
       if (!change.label.trim()) continue;
       topic = { id: change.id, label: change.label.trim(), relatedness: clamp01(change.relatedness), details: [], links: [] };
+      // A topic's place in the tree is set once, when it first appears, so branches never move.
+      if (change.parentId && change.parentId !== change.id) topic.parentId = change.parentId;
       topics.push(topic);
       byId.set(topic.id, topic);
     }
@@ -184,15 +190,39 @@ function merge(current: MindMap, changes: z.infer<typeof Changes>): MindMap {
     }
   }
 
-  // Links may point at topics added later in the same reply, so filter once everything is in.
-  for (const topic of topics) topic.links = topic.links.filter((l) => l.to !== topic.id && byId.has(l.to));
+  // Links and parents may point at topics added later in the same reply, so check once everything
+  // is in. A parent that doesn't exist, or that would make a loop, puts the topic off the centre.
+  for (const topic of topics) {
+    topic.links = topic.links.filter((l) => l.to !== topic.id && byId.has(l.to));
+    if (topic.parentId && (!byId.has(topic.parentId) || makesLoop(topic, byId))) delete topic.parentId;
+    // Also express the branch as a strong link, for layouts that only read links.
+    if (topic.parentId && !topic.links.some((l) => l.to === topic.parentId)) topic.links.unshift({ to: topic.parentId, strength: 0.9 });
+  }
   return { title: changes.title.trim() || current.title || "Lecture", topics };
+}
+
+function makesLoop(topic: MindmapTopic, byId: Map<string, MindmapTopic>): boolean {
+  const seen = new Set([topic.id]);
+  for (let p = topic.parentId; p; p = byId.get(p)?.parentId) {
+    if (seen.has(p)) return true;
+    seen.add(p);
+  }
+  return false;
 }
 
 function clamp01(x: number): number {
   return Number.isFinite(x) ? Math.round(Math.min(1, Math.max(0, x)) * 100) / 100 : 0.5;
 }
 
+/** The same tree as a nested outline: branches become deeper headings. */
 function toMarkdown(map: MindMap): string {
-  return [`# ${map.title}`, ...map.topics.flatMap((t) => [`## ${t.label}`, ...t.details.map((d) => `- ${d}`)])].join("\n");
+  const lines = [`# ${map.title}`];
+  const add = (parentId: string | undefined, depth: number) => {
+    for (const t of map.topics.filter((x) => x.parentId === parentId)) {
+      lines.push(`${"#".repeat(Math.min(depth, 6))} ${t.label}`, ...t.details.map((d) => `- ${d}`));
+      add(t.id, depth + 1);
+    }
+  };
+  add(undefined, 2);
+  return lines.join("\n");
 }

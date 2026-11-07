@@ -5,12 +5,13 @@ import express, { type NextFunction, type Request, type Response } from "express
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 import { Annotator } from "./annotate.js";
 import { BoardReader } from "./board.js";
-import { claudeEnabled } from "./claude.js";
+import { claudeEnabled, usage } from "./claude.js";
 import { config } from "./config.js";
 import { EventLog, type CaptionEvent } from "./events.js";
 import { MindMapper } from "./mindmap.js";
 import { CatchUpWriter } from "./catchup.js";
 import { LostTracker } from "./lost.js";
+import { TopicNotesWriter } from "./notes.js";
 import { replayFile } from "./replay.js";
 import { settings, updateSettings } from "./settings.js";
 import { CaptionAssembler, DeepgramStream } from "./stt.js";
@@ -39,7 +40,11 @@ let pipelines = createPipelines();
 let stopReplay: (() => void) | null = null;
 let lost = new LostTracker(log);
 let catchUps = new CatchUpWriter(log);
-log.subscribe((event) => lost.observe(event));
+let notes = new TopicNotesWriter(log);
+log.subscribe((event) => {
+  lost.observe(event);
+  notes.observe(event);
+});
 
 // ---------- WebSockets: /ws for students (receive only), /ws/teacher for microphone audio ----------
 
@@ -150,6 +155,7 @@ function resetLecture(): void {
   pipelines = createPipelines();
   lost = new LostTracker(log);
   catchUps = new CatchUpWriter(log);
+  notes = new TopicNotesWriter(log);
   // Phones reconnect automatically and download the (now empty) log.
   for (const ws of studentWss.clients) ws.close(1012, "lecture reset");
 }
@@ -174,6 +180,9 @@ app.get("/api/status", (_req, res) => {
     teachers: teacherWss.clients.size,
     claude: claudeEnabled,
     deepgram: Boolean(config.deepgramKey),
+    models: { board: config.claudeModel, text: config.claudeTextModel },
+    // What Claude has cost since the server started, per kind of call.
+    ai: { calls: usage.calls, costUsd: Number(usage.costUsd.toFixed(4)), byTask: usage.byTask },
   });
 });
 
@@ -191,6 +200,15 @@ app.post("/api/lost", express.json(), async (req, res) => {
   if (!result.ok) return void res.status(result.status).json({ error: result.error });
   const catchUp = await catchUps.get(result.t, result.topicId, result.highlights);
   res.json({ ...result, catchUp });
+});
+
+// Notes for a mind map topic, written the first time anyone opens it and shared after that.
+// Open to any site so Lovable's preview can fetch them too.
+app.get("/api/topics/:id/notes", async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  const pending = notes.get(req.params.id);
+  if (!pending) return void res.status(404).json({ error: "no such topic on the current mind map" });
+  res.json(await pending);
 });
 
 app.get("/api/settings", (_req, res) => res.json(settings));
@@ -272,5 +290,5 @@ server.listen(config.port, () => {
   console.log(`  Teacher console: http://localhost:${config.port}/teach/`);
   console.log(`  Test viewer:     http://localhost:${config.port}/teach/viewer.html`);
   console.log(`  Student feed:    ws://localhost:${config.port}/ws`);
-  console.log(`  Claude: ${claudeEnabled ? "on" : "OFF (no key)"} · Deepgram: ${config.deepgramKey ? "on" : "OFF (no key)"}`);
+  console.log(`  Claude: ${claudeEnabled ? `board ${config.claudeModel}, text ${config.claudeTextModel}` : "OFF (no key)"} · Deepgram: ${config.deepgramKey ? "on" : "OFF (no key)"}`);
 });

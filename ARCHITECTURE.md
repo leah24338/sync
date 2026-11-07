@@ -99,6 +99,19 @@ next to each other. **We compute the scores (understanding the lecture); Person 
 placement (drawing).** Tested: core topic 0.8, a historical aside and a sports application 0.5,
 an unrelated aside about octopuses 0.1.
 
+**Branches:** each topic can have a `parentId` (the topic it branches off: a case, method,
+example or part of it). It's set once, when the topic first appears, so branches never move;
+broken or looping parents fall back to the centre. Branches are also sent as a strong link so
+layouts that only read links still draw the tree. Tested with real speech: Solving methods →
+Factoring / Completing the square / Quadratic formula → Discriminant.
+
+**Topic notes (`notes.ts`, `GET /api/topics/:id/notes`):** written the first time anyone opens a
+topic, then shared (3 ms on repeat). Grounded in what was said while the focus was on that topic or
+its branches (windows start 8 s early because the focus lags the words), plus any sentence naming
+it, the board at that time and the terms explained then. Returns a summary, key points, an
+example, board formulas (with plain/spoken), terms and how much material it used. Regenerated only
+when the topic has grown. About a cent per topic opened.
+
 **"You are here" (focus):** the server also tracks which topic the teacher is on right now, so
 the student app can put a dot on it. Two sources, both in `mindmap.ts`:
 1. Each mind map update also returns `current`: the topic the new speech ended on.
@@ -175,6 +188,7 @@ Each row is something you can point to in the code and explain.
 | Captions never wait for AI | The caption shows instantly; the explanation attaches a few seconds later (2–3 s typical) as a separate event | `annotate.ts` (fire-and-forget `add`) |
 | Sentence-sized captions | Ends on a 300 ms pause, a full stop, or 220 characters, with Deepgram's "utterance end" as a backup in noisy rooms | `stt.ts` `CaptionAssembler` |
 | Effort tuned per task | `low` for per-sentence notes and the mind map (fast), `medium` for reading the board (accuracy matters more) | `annotate.ts`, `mindmap.ts`, `board.ts` |
+| Fast model for text tasks | Claude Haiku 5.5 answers notes in ~0.6–1.7 s (Opus: 2–3 s) | `config.ts` `claudeTextModel` |
 
 ### Cost (fewer, smaller AI calls)
 
@@ -189,6 +203,8 @@ Each row is something you can point to in the code and explain.
 | Teacher can switch explanations off | With idioms and terms both off, the per-sentence AI call is skipped entirely (verified: zero calls); "Only tricky" cuts reply size from ~110 to ~11 tokens on sentences with nothing tricky | `annotate.ts` `add`, `settings.ts` |
 | Student filtering on the phone | Each student's "how many explanations" choice is a filter on data already sent, so personalizing costs nothing | `annotation.level`, student app |
 | Replay is free | Demo and testing don't touch the APIs | `replay.ts` |
+| Two models, picked per task | Reading the board (vision, accuracy matters most) stays on Claude Opus 5.5; the high-volume text tasks (notes, mind map, focus, catch-ups, topic notes) run on Claude Haiku 5.5, $0.10 / $0.50 per million tokens instead of $4 / $20. Measured: a note costs ~$0.0001 instead of ~$0.005. Change either with `CLAUDE_MODEL` / `CLAUDE_TEXT_MODEL` in `.env` | `config.ts`, `claude.ts` `askJson` (`task`) |
+| Running cost counter | Every call's cost is logged (`[claude] annotate c3 (claude-haiku-5-5): … $0.0001`) and totalled per kind of call in `GET /api/status` (`ai`), so spend is visible, not guessed | `claude.ts` `usage` |
 | Max 4 Claude calls at once | Avoids rate-limit errors during bursts of speech | `claude.ts` `withSlot` |
 
 ### Bandwidth and reconnects
@@ -212,7 +228,7 @@ Each row is something you can point to in the code and explain.
 | KeepAlive | Deepgram hangs up after ~10 s of silence; the server pings it while the mic is paused | `stt.ts` |
 | AI failures are contained | Every Claude call returns `null` on error instead of throwing, so a failed explanation never stops captions | `claude.ts` `askJson` |
 | Structured outputs | Claude's replies are forced to match a schema (Zod), so there's no fragile text parsing | `claude.ts` |
-| Refusal fallback | If a safety classifier ever declines a request, the API retries it on Anthropic's recommended fallback model | `claude.ts` (`fallbacks: "default"`) |
+| Refusal fallback | If a safety classifier ever declines a request, the API retries it on Anthropic's recommended fallback model (board reads only: Haiku has no server-side fallback, so a declined text call is skipped like any other failed call) | `claude.ts` (`fallbacks: "default"`) |
 | Clean reset | Reset discards half-finished captions and reconnects every phone to the empty log | `index.ts` `resetLecture` |
 
 ### Accuracy and trust
@@ -234,31 +250,38 @@ Each row is something you can point to in the code and explain.
 happens once on the server and the result is shared with every phone, so 3 students or 300 cost
 the same.
 
-**Estimated cost of one lecture hour today** (all Claude Opus 5.5; assumes ~10 finished
-sentences a minute, ~1 board read a minute, a mind map update every 45 s; per-call costs measured):
+**Estimated cost of one lecture hour** (assumes ~10 finished sentences a minute, ~1 board read a
+minute, a mind map update every 45 s; per-call costs measured):
 
-| Part | Calls per hour | Cost per hour |
-|---|---|---|
-| Idiom / term notes | ~600 | ~$3.00 |
-| Board reads | ~60 | ~$0.60 |
-| Mind map | ~80 | ~$0.30 |
-| Deepgram speech-to-text | per minute of audio | check the Deepgram console for the rate |
-| **Claude total** | | **~$4 per lecture hour** (~$0.13 per student in a class of 30) |
+| Part | Calls per hour | All on Opus 5.5 (before) | Text on Haiku 5.5 (now) |
+|---|---|---|---|
+| Idiom / term notes | ~600 | ~$3.00 | ~$0.08 |
+| Board reads (Opus in both) | ~60 | ~$0.60 | ~$0.60 |
+| Mind map + focus | ~80 + ~200 | ~$0.30 + ~$0.60 | ~$0.03 + ~$0.02 |
+| Deepgram speech-to-text | per minute of audio | check the Deepgram console | same |
+| **Claude total** | | **~$4.50 per lecture hour** | **~$0.75 per lecture hour** (~$0.03 per student in a class of 30) |
 
-Per-sentence notes are ~75% of the bill, so that's where the next savings are.
+Board reads are now ~80% of the bill. Check real numbers in `GET /api/status` → `ai.byTask`.
+
+**Quality check (2026-11-07, `npm run smoke` on Haiku):** sarcasm ("Oh great", level 3), idioms
+("a piece of cake") and terms (discriminant, negative discriminant, quadratic equations) all came
+back; the mind map got the same relatedness spread as Opus (core 0.8, asides 0.5, octopus tangent
+0.1) and the focus followed the speaker back to "Discriminant". One miss vs Opus: "tackling" wasn't
+flagged as an idiom. If notes ever look worse, set `CLAUDE_TEXT_MODEL=claude-opus-5-5` (old
+behaviour) or `claude-sonnet-5-5` (middle: $2 / $10).
 
 ### Further options (not built yet)
 
 | Option | Saves | Trade-off |
 |---|---|---|
-| Notes and mind map on Claude Haiku 5.5 ($0.10 / $0.50 per million tokens vs $4 / $20); keep Opus for the board | Notes drop from ~$3 to under $0.10 an hour; likely faster too | Must re-check sarcasm and idiom quality with `npm run smoke` |
+| Board reads on Claude Sonnet 5.5 ($2 / $10) | Roughly halves the biggest remaining part (~$0.60 → ~$0.30 an hour) | Must re-check handwriting and LaTeX accuracy on real board photos first |
 | Batch notes: one call per ~3 sentences or ~10 s | ~half the note calls' input tokens (the instructions are sent once, not three times) | Notes arrive up to ~10 s after the sentence |
 | Crop the camera to the board once at setup | Fewer image tokens, and less background for Claude to misread | One extra setup step |
 | Pause the AI when no phone is connected | Nothing spent during setup and rehearsals (meanwhile, set both explanation settings to Off) | Late joiners miss notes from that stretch |
 | Spending limit in the Anthropic console | Caps the worst case | None |
 
-**What wouldn't help:** prompt caching (our prompts are a few hundred tokens, below the minimum
-size that can be cached) and a database (it stores data; it doesn't reduce AI calls).
+**What wouldn't help:** prompt caching (the fixed part of each prompt, the instructions, is under
+the 512-token minimum that current models can cache; everything after it changes every call) and a database (it stores data; it doesn't reduce AI calls).
 
 ## Privacy
 
@@ -330,6 +353,8 @@ server/
   src/settings.ts   Teacher's explanation settings (off / tricky / standard / all)
   src/lost.ts       Anonymous "I'm lost" flags: topic lookup, limits, counts
   src/catchup.ts    "I'm lost" catch-ups (2-line summary + assumed knowledge), shared per moment
+  src/notes.ts      Notes for a mind map topic, written on first open and shared
+  mock/notes.json   Pre-generated notes for the demo lecture's topics
   src/board.ts      Whiteboard photo → text + LaTeX
   src/mathText.ts   Validates LaTeX, converts to readable Unicode and spoken words
   src/mindmap.ts    Incremental mind map outline
@@ -453,6 +478,17 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** Cheaper AI: text tasks (notes, mind map, focus, catch-ups, topic notes) moved to
+  Claude Haiku 5.5, board reading stays on Opus 5.5 (`CLAUDE_TEXT_MODEL` / `CLAUDE_MODEL`). Each
+  call's cost is logged and totalled in `/api/status` (`ai`). Estimated ~$4.50 → ~$0.75 per lecture
+  hour. Smoke-tested on Haiku: notes, sarcasm, mind map and focus all correct; notes also faster.
+
+- **2026-11-07:** Branching mind map (`parentId`), topic notes on demand (`notes.ts`), and a new
+  ~90 s demo lecture with a real tree, varied relatedness, focus moves, board lines and "I'm lost"
+  presses (`mock/lecture.json`) plus pre-generated notes (`mock/notes.json`), also copied into the
+  student app as mock data. Found a student-app crash that only happens right after its code changes
+  while the dev server runs: restart the student app after pulling. Lovable prompt 8.
 
 - **2026-11-07:** Teacher console restyled to match the student app's SYNC. design (wordmark,
   Playfair Display + Atkinson Hyperlegible, shared oklch palette in light and dark), in a more

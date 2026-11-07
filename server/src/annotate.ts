@@ -58,6 +58,7 @@ export class Annotator {
       label: `annotate ${caption.id}`,
       schema: Notes,
       effort: "low",
+      task: "text",
       system: SYSTEM,
       content: [
         `INCLUDE: ${include("idioms and sarcasm", settings.idioms)}; ${include("technical terms", settings.terms)}`,

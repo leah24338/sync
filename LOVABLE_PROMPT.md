@@ -353,3 +353,44 @@ Use these only if the first prompt above was already pasted before they were add
 > - Update `src/test/lost.test.ts`: the request body now has `clientId`, `highlights` (and `t` when
 >   sent).
 > - The catch-up card (prompt 6) now focuses on the highlighted words; no change needed there.
+
+## 8. Branching mind map, topic notes and the demo lecture (added 2026-11-07)
+
+> **Demo data (already in the repo):** `src/lib/demo/demoLecture.json` (a ~90 s branching lecture
+> in the live event format) and `src/lib/demo/demoNotes.json` (notes for each of its topics). See
+> `src/lib/demo/README.md`. In mock mode, play `demoLecture.json` instead of `mockLecture.ts`: each
+> event at its `t` (ms), `lost` events at their `at`. This is our backup if the live demo breaks.
+>
+> **Branches:** mind map topics now have `parentId?: string` (the topic they branch off; absent =
+> off the centre). Add it to `MindmapTopic`. In `layoutTopics`, use `parentId` as the parent and
+> fall back to the strongest link only when it's missing.
+>
+> **Remove the hard-coded demo special cases** in `src/lib/mindmap.ts`: merging "Discriminant" into
+> "Quadratic formula", the forced "Babylonian origins" link, folding "Definition"/"What is it" into
+> the root, and the quadratic-specific word matching in `currentTopic` (use the server's `focus`
+> event instead). They hide real topics in any other lecture (the Discriminant box currently
+> disappears). Keep merging of identical labels.
+>
+> **Relatedness as distance:** low-relatedness top-level topics should look far from the centre,
+> not just a bit further right. Push them further out *and* towards the outer edge of their side;
+> for tangents (relatedness < 0.3) use a dashed connector, a slightly smaller, muted box. Add a
+> small legend: "Closer to the centre = more related".
+>
+> **Topic notes:** clicking or tapping a topic box, pressing Enter on it (make boxes focusable,
+> `role="button"`), long-pressing on touch, or hovering about 600 ms on desktop (not while
+> panning) opens a notes panel: a popover by the box on desktop, a bottom sheet on phones.
+> - Live: `GET {serverBase}/api/topics/{id}/notes` (`serverBase` = `?server=` or the page origin).
+>   The first open takes ~3 s (show "Writing notes…" skeleton); after that it's instant. 404 →
+>   "Notes appear once this topic is on the map." Mock: read `demoNotes.json`.
+> - Shape:
+>   ```ts
+>   { topicId: string; label: string; parentLabel?: string; summary: string; keyPoints: string[];
+>     example: string; formulas: { latex: string; plain: string; spoken: string }[];
+>     terms: { phrase: string; meaning: string }[]; basedOn: { sentences: number; boardLines: number } }
+>   ```
+> - Show: breadcrumb (`parentLabel` ›) and title, `summary`, `keyPoints` as a list, `example` if not
+>   empty, `formulas` with KaTeX (`aria-label` = `spoken`, fall back to `plain`), `terms` as
+>   "phrase — meaning", and a small footer "Written from {sentences} sentences and {boardLines} board
+>   lines of this lecture". All text is plain (maths as x², √, ±) except `formulas[].latex`.
+> - Escape or clicking outside closes it and returns focus to the box. Respect the reader's font
+>   and size settings.
