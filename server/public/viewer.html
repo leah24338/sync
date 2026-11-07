@@ -200,6 +200,10 @@
     } else if (event.type === "focus") {
       focusId = event.topicId;
       showFocus();
+    } else if (event.type === "lost") {
+      const s = Math.floor(event.t / 1000);
+      const where = topicLabels.get(event.topicId);
+      feed.append(el("div", "mapline", `⚑ A student is lost at ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}${where ? ` (${where})` : ""}`));
     } else if (event.type === "mindmap") {
       topicLabels = new Map((event.topics ?? []).map((t) => [t.id, t.label]));
       showFocus();

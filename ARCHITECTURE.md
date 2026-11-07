@@ -55,6 +55,7 @@ There are four kinds of event (the same contract the Lovable app uses):
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
 | `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
 | `board` | The whole cleaned-up whiteboard at that moment, plus a link to the photo. Each line: `content` (LaTeX for equations; words with any maths in `$…$` for text), `plain` (readable Unicode) and `spoken` (words for screen readers). |
+| `lost` | A student pressed "I'm lost" (anonymous): `t` (the moment they were lost at), `at` (when they pressed), `topicId`, `captionId` (what was being said). |
 | `focus` | Which mind map topic the teacher is talking about right now (`topicId`). Only sent when it changes; the log keeps just the latest one. |
 | `mindmap` | The whole mind map: `title` (the main subject), `topics` (each with a `relatedness` score 0–1, `details` and `links` to other topics), and the same map as a Markdown outline (`markdown`) for simple tree views. |
 
@@ -110,6 +111,28 @@ A `focus` event goes out only when the topic changes. Tested with real calls: th
 the speaker from Discriminant to an unrelated aside and back; a seven-word remark about "those
 old clay tablets" moved it to Babylonian history without a mind map update. Cost: each check is
 ~500 input tokens (≈ $0.003), at most a few a minute and only while someone is talking.
+
+### "I'm lost": students talking back to the teacher (`lost.ts`)
+
+The one place students send something to the server:
+
+1. A student presses "I'm lost" and picks the moment (and optionally the topic) in the app.
+2. The app sends `POST /api/lost` `{ clientId, t, topicId? }`. `clientId` is a random id kept on
+   the phone, used only so one student can't count twice. Nothing identifying is stored or shown.
+3. The server fills in the topic the teacher was on at moment `t` (from the focus history) when the
+   student didn't pick one, and what was being said then. It ignores the same phone flagging the same
+   topic again within 2 minutes, allows one press per phone every 5 s, and broadcasts a `lost` event
+   to every screen.
+4. It replies with how many students are lost on that topic (last 10 min), so the student sees
+   "you're not alone".
+5. The teacher console's **Students lost** panel shows the total for the last 10 minutes, a bar per
+   topic (the current topic is marked "now"), the most confusing moments with the caption at that
+   time, and an alert toast as each press arrives.
+
+`/api/lost` allows cross-site requests, so Lovable's own preview (on its own domain) can send flags
+too. Tested: automatic topic (a press "now" → Quadratic formula, a press pointing at 0:16 →
+Definition), counts, the duplicate and rate limits, cross-site access via the server tunnel, and the
+panel with the demo lecture's sample presses.
 
 ### 5. Explanation settings: two layers (`settings.ts`)
 
@@ -273,6 +296,7 @@ Server → page: `{"type":"status","state":"connecting|open|closed|error","messa
 | `GET /api/status` | Viewer count, event count, whether Claude/Deepgram keys are set |
 | `GET /api/settings` · `POST /api/settings` | Explanation settings: `{"idioms":"off|tricky|standard|all","terms":"…"}` (either field optional) |
 | `POST /api/board` | Body: a JPEG. Queues a board read (202) |
+| `POST /api/lost` | `{ clientId, t?, topicId? }` from a student's phone. Returns `{ ok, duplicate, topicId?, students }`; 429 if pressed again within 5 s. Open to any site |
 | `GET /api/snapshots/:id` | A stored board photo |
 | `POST /api/replay` | `{}` for the demo lecture, or `{"session":"<file>","speed":2}` |
 | `POST /api/replay/stop` · `POST /api/save` · `GET /api/sessions` · `POST /api/reset` | Lecture controls |
@@ -287,6 +311,7 @@ server/
   src/claude.ts     Shared Claude call: structured outputs, fallback, concurrency cap, errors
   src/annotate.ts   Idioms, sarcasm, key terms (with a 1–3 confusion level)
   src/settings.ts   Teacher's explanation settings (off / tricky / standard / all)
+  src/lost.ts       Anonymous "I'm lost" flags: topic lookup, limits, counts
   src/board.ts      Whiteboard photo → text + LaTeX
   src/mathText.ts   Validates LaTeX, converts to readable Unicode and spoken words
   src/mindmap.ts    Incremental mind map outline
@@ -410,6 +435,11 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** "I'm lost" goes to the teacher: `POST /api/lost` (anonymous, rate-limited,
+  cross-site), `lost` events with the topic filled in from the focus history, a Students lost panel
+  in the teacher console (per topic, top moments, alert toasts), sample presses in the demo
+  lecture, replays play presses when they were pressed. Lovable prompt 5.
 
 - **2026-11-07:** Readable board maths: `$…$` inline maths in text lines, server-side KaTeX
   validation with Unicode fallback, `plain` and `spoken` on every board line, mind map fed with

@@ -31,7 +31,14 @@ export type MindmapEvent = { type: "mindmap"; t: number; markdown: string; title
 /** Which mind map topic the teacher is talking about right now (an id from the latest mind map). */
 export type FocusEvent = { type: "focus"; t: number; topicId: string };
 
-export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent | FocusEvent;
+/**
+ * A student pressed "I'm lost" (anonymous). `t`: the lecture moment they were lost at;
+ * `at`: when they pressed it; `topicId`: mind map topic (if known); `captionId`: what was being
+ * said at `t` (if known).
+ */
+export type LostEvent = { type: "lost"; t: number; at: number; topicId?: string; captionId?: string };
+
+export type LectureEvent = CaptionEvent | AnnotationEvent | BoardEvent | MindmapEvent | FocusEvent | LostEvent;
 
 type Listener = (event: LectureEvent) => void;
 

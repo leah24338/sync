@@ -9,6 +9,7 @@ import { claudeEnabled } from "./claude.js";
 import { config } from "./config.js";
 import { EventLog, type CaptionEvent } from "./events.js";
 import { MindMapper } from "./mindmap.js";
+import { LostTracker } from "./lost.js";
 import { replayFile } from "./replay.js";
 import { settings, updateSettings } from "./settings.js";
 import { CaptionAssembler, DeepgramStream } from "./stt.js";
@@ -35,6 +36,8 @@ function createPipelines() {
 
 let pipelines = createPipelines();
 let stopReplay: (() => void) | null = null;
+let lost = new LostTracker(log);
+log.subscribe((event) => lost.observe(event));
 
 // ---------- WebSockets: /ws for students (receive only), /ws/teacher for microphone audio ----------
 
@@ -143,6 +146,7 @@ function resetLecture(): void {
   log.reset();
   snapshots.clear();
   pipelines = createPipelines();
+  lost = new LostTracker(log);
   // Phones reconnect automatically and download the (now empty) log.
   for (const ws of studentWss.clients) ws.close(1012, "lecture reset");
 }
@@ -168,6 +172,19 @@ app.get("/api/status", (_req, res) => {
     claude: claudeEnabled,
     deepgram: Boolean(config.deepgramKey),
   });
+});
+
+// Students press "I'm lost". Open to any site (Lovable's preview runs on its own domain);
+// it's anonymous and rate-limited per phone.
+app.use("/api/lost", (req, res, next) => {
+  res.set({ "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "content-type" });
+  if (req.method === "OPTIONS") return void res.sendStatus(204);
+  next();
+});
+app.post("/api/lost", express.json(), (req, res) => {
+  const result = lost.flag(req.body);
+  if (!result.ok) return void res.status(result.status).json({ error: result.error });
+  res.json(result);
 });
 
 app.get("/api/settings", (_req, res) => res.json(settings));

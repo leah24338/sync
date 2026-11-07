@@ -243,3 +243,49 @@ Use these only if the first prompt above was already pasted before they were add
 > ```json
 > {"type": "board", "id": "b2", "t": 28000, "snapshotUrl": "/placeholder.svg", "blocks": [{"id": "k1", "kind": "text", "content": "Standard form", "plain": "Standard form", "spoken": "Standard form"}, {"id": "k2", "kind": "equation", "content": "ax^2 + bx + c = 0", "plain": "ax² + bx + c = 0", "spoken": "a, x, squared, plus, b, x, plus, c, equals, 0"}, {"id": "k3", "kind": "text", "content": "Quadratic formula", "plain": "Quadratic formula", "spoken": "Quadratic formula"}, {"id": "k4", "kind": "equation", "content": "x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}", "plain": "x = (−b ± √(b² − 4ac)) / 2a", "spoken": "x, equals, start fraction, minus, b, plus minus, square root of, b, squared, minus, 4, a, c, end square root, divided by, 2, a, end fraction"}, {"id": "k5", "kind": "text", "content": "Works whenever $a \\neq 0$", "plain": "Works whenever a ≠ 0", "spoken": "Works whenever a, does not equal, 0"}]}
 > ```
+
+## 5. "I'm lost" reaches the teacher (added 2026-11-07)
+
+> Right now "I'm lost" flags stay on the student's own phone, so the teacher never sees them.
+> Send them to the lecture server instead, and build the Pulse view from everyone's flags.
+>
+> **New event** from the server (add to the `LectureEvent` union and keep a `lost` array in the
+> lecture state; on reconnect the server re-sends all of them):
+>
+> ```ts
+> | { type: "lost"; t: number; at: number; topicId?: string; captionId?: string }
+> // t: lecture moment the student was lost at · at: when they pressed it
+> // topicId: mind map topic (if known) · captionId: what was being said at t (if known)
+> ```
+>
+> **Sending a flag** (when the student confirms in the "Which part lost you?" sheet):
+> - `POST {serverBase}/api/lost` with JSON `{ clientId, t, topicId }`. `serverBase` is the
+>   `?server=` address when present, otherwise the page's own origin (same rule as the WebSocket).
+> - `clientId`: a random id made once with `crypto.randomUUID()` and kept in localStorage
+>   (`lectureLensClientId`; wrap storage in try/catch and fall back to an in-memory id). It's only
+>   used to stop one phone counting twice. Never send names or anything personal.
+> - `topicId` is optional: if the student doesn't pick one, the server fills in the topic the
+>   teacher was on at moment `t`.
+> - Responses: `200 { ok: true, duplicate, topicId?, students }`. Show a confirmation (in an
+>   `aria-live` region): "Sent anonymously. {students} student(s) lost on {topic label} right now."
+>   If `duplicate` is true: "You've already flagged this. Your teacher knows." On `429`: "Give it a
+>   few seconds before flagging again." On a network error: "Couldn't send. Try again."
+>
+> **The sheet:** keep the timestamp slider and the quote of what was being said. Above it, add
+> topic chips from the latest mind map topics, with the current focus topic pre-selected and a
+> "Not sure" chip (sends no `topicId`). Moving the slider pre-selects the topic that was current
+> at that moment if you know it.
+>
+> **Remove the local `flags` state.** The Pulse tab now uses the `lost` events from the server
+> (class-wide, anonymous): bars per topic (labels from the latest mind map; "Not on the mind map
+> yet" for flags without a known topic) and per 30-second moment with the quoted caption (look up
+> `captionId`). Add a line for students: "You're not alone: {n} students flagged this part."
+>
+> Add these to the mock lecture (after the event at t: 28000, 36000 and 40000 respectively) so the
+> Pulse view has data in mock mode:
+>
+> ```json
+> {"type":"lost","t":24500,"at":30000,"topicId":"t3","captionId":"c5"}
+> {"type":"lost","t":36000,"at":39000,"topicId":"t4","captionId":"c6"}
+> {"type":"lost","t":40500,"at":42000,"topicId":"t4","captionId":"c7"}
+> ```
