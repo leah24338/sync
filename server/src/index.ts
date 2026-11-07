@@ -10,6 +10,7 @@ import { config } from "./config.js";
 import { EventLog, type CaptionEvent } from "./events.js";
 import { MindMapper } from "./mindmap.js";
 import { replayFile } from "./replay.js";
+import { settings, updateSettings } from "./settings.js";
 import { CaptionAssembler, DeepgramStream } from "./stt.js";
 
 const log = new EventLog();
@@ -164,6 +165,15 @@ app.get("/api/status", (_req, res) => {
     claude: claudeEnabled,
     deepgram: Boolean(config.deepgramKey),
   });
+});
+
+app.get("/api/settings", (_req, res) => res.json(settings));
+
+app.post("/api/settings", requireTeacher, express.json(), (req, res) => {
+  const updated = updateSettings(req.body);
+  if (!updated) return void res.status(400).json({ error: 'idioms/terms must be "off", "tricky", "standard" or "all"' });
+  console.log(`[settings] idioms: ${updated.idioms}, terms: ${updated.terms}`);
+  res.json(updated);
 });
 
 app.get("/api/snapshots/:id", (req, res) => {

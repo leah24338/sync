@@ -214,6 +214,28 @@ setInterval(() => {
   }
 }, TICK_MS);
 
+// ---------- Explanation settings ----------
+
+async function loadSettings() {
+  try {
+    const current = await fetch("/api/settings").then((r) => r.json());
+    $("idioms").value = current.idioms;
+    $("terms").value = current.terms;
+  } catch {
+    // Keep the defaults shown in the page.
+  }
+}
+loadSettings();
+
+for (const id of ["idioms", "terms"]) {
+  $(id).onchange = async () => {
+    const res = await post("/api/settings", { idioms: $("idioms").value, terms: $("terms").value });
+    $("settingsStatus").textContent = res.error
+      ? `Couldn't save: ${res.error}`
+      : `Saved. Applies from the next sentence. Idioms: ${$("idioms").selectedOptions[0].text} · Key terms: ${$("terms").selectedOptions[0].text}`;
+  };
+}
+
 // ---------- Lecture controls ----------
 
 async function loadSessions() {

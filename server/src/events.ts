@@ -8,6 +8,8 @@ export type AnnotationEvent = {
   kind: "idiom" | "term";
   phrase: string;
   meaning: string;
+  /** How likely it is to confuse a student: 1 = most know it, 3 = likely to confuse. */
+  level: 1 | 2 | 3;
 };
 export type BoardEvent = { type: "board"; id: string; t: number; snapshotUrl: string; blocks: BoardBlock[] };
 export type MindmapEvent = { type: "mindmap"; t: number; markdown: string };
