@@ -136,3 +136,38 @@ Use these only if the first prompt above was already pasted before they were add
 > In Settings, replace the "Explain idioms and key terms" toggle with an "Explanations" choice:
 > Everything (level 1+, default) / Standard (level 2+) / Only tricky ones (level 3 only) / Off.
 > It hides annotations below the chosen level on this phone only. Save it with the other settings.
+
+## 2. Mind map placed by relatedness (added 2026-11-07)
+
+> Mind map events now also include `title` and `topics` (the `markdown` field stays, so nothing
+> breaks). Add them to the `LectureEvent` type:
+>
+> ```ts
+> { type: "mindmap"; t: number; markdown: string; title?: string;
+>   topics?: { id: string; label: string; relatedness: number; details: string[];
+>              links: { to: string; strength: number }[] }[] }
+> ```
+>
+> `relatedness` (0–1) is how closely a topic relates to the lecture's main subject; `links` connect
+> related topics (`to` is another topic's id, `strength` 0–1). Topic ids stay the same across updates.
+>
+> Redraw the Mind map tab as a **radial map** using `d3-force` (add it as a dependency):
+> - The `title` sits fixed in the centre.
+> - Each topic is a node pulled to a ring whose radius grows as relatedness drops:
+>   `radius = minR + (1 - relatedness) * (maxR - minR)` with `forceRadial`. Core topics hug the
+>   centre; tangents sit near the edge.
+> - `forceLink` between linked topics (strength from `links`) so related topics cluster on the
+>   same side; `forceCollide` so labels don't overlap.
+> - A topic's `details` appear as small chips under its label (or on tap, on small screens).
+> - Keep node positions keyed by `id` between updates so existing topics don't jump; new topics
+>   animate in. Respect `prefers-reduced-motion`.
+> - Draw a faint ring guide at each relatedness band and a small legend: "closer to the centre =
+>   more related to today's topic".
+> - If an event has no `topics`, fall back to the current markmap tree from `markdown`.
+>
+> Add this sample as the last event of the mock lecture (at t: 50000) so the layout has a tangent
+> to show:
+>
+> ```json
+> {"type": "mindmap", "t": 50000, "markdown": "# Quadratic equations\n## Definition\n- Highest power of x is 2\n## Standard form\n- ax² + bx + c = 0\n## Quadratic formula\n- x = (−b ± √(b² − 4ac)) / 2a\n## Discriminant\n- b² − 4ac\n- Negative → no real solutions\n## Babylonian origins\n- Solved ~4,000 years ago\n- Written on clay tablets", "title": "Quadratic equations", "topics": [{"id": "t1", "label": "Definition", "relatedness": 0.9, "details": ["Highest power of x is 2"], "links": []}, {"id": "t2", "label": "Standard form", "relatedness": 0.85, "details": ["ax² + bx + c = 0"], "links": [{"to": "t1", "strength": 0.6}]}, {"id": "t3", "label": "Quadratic formula", "relatedness": 0.9, "details": ["x = (−b ± √(b² − 4ac)) / 2a"], "links": [{"to": "t2", "strength": 0.8}]}, {"id": "t4", "label": "Discriminant", "relatedness": 0.8, "details": ["b² − 4ac", "Negative → no real solutions"], "links": [{"to": "t3", "strength": 0.9}]}, {"id": "t5", "label": "Babylonian origins", "relatedness": 0.3, "details": ["Solved ~4,000 years ago", "Written on clay tablets"], "links": [{"to": "t3", "strength": 0.3}]}]}
+> ```

@@ -9,14 +9,14 @@
 |---|---|
 | Team | 2 people: Person 1 = pipeline (local, with Claude Code), Person 2 = student app (Lovable). **TODO**: put names on the roles |
 | MVP scope | Decided, trimmed for two people (below) |
-| Student app | Proposed: built in Lovable (100 credits), synced to GitHub, cloned into `web/` |
+| Student app | Built in Lovable (TanStack Start), synced to GitHub, runs locally on port 8080 |
 | Server + teacher page | **Built (v1)** in `server/`. Captions, notes, board reading and mind map tested end to end with real keys. How it works and why: `ARCHITECTURE.md` |
 | Runtime AI | Claude Opus 5.5 (`claude-opus-5-5`) called from our server. Lovable's built-in AI is **not** used |
 | Speech-to-text | Deepgram streaming (AssemblyAI as backup) |
 | Tunnel | cloudflared quick tunnel (ngrok as backup) |
 | Primary persona | **TODO**: pick one (e.g. first-semester international student, or hard-of-hearing student) |
 | Hackathon length / deadline | **TODO**: fill in, then adjust the timeline below |
-| Repos | This folder: GitHub `leah24338/sync` (`main`). Server code not committed yet. **TODO**: Lovable project → its own GitHub repo |
+| Repos | Server + docs: `leah24338/sync`. Student app: `chengrace086-ux/lecture-lens` (Lovable), cloned into `web/`, connected to the server through the Vite proxy and verified in live mode |
 
 ## The product in one sentence
 

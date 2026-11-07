@@ -55,7 +55,7 @@ There are four kinds of event (the same contract the Lovable app uses):
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
 | `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
 | `board` | The whole cleaned-up whiteboard at that moment: text blocks and LaTeX equations, plus a link to the photo. |
-| `mindmap` | The whole mind map as a Markdown outline. |
+| `mindmap` | The whole mind map: `title` (the main subject), `topics` (each with a `relatedness` score 0–1, `details` and `links` to other topics), and the same map as a Markdown outline (`markdown`) for simple tree views. |
 
 The server keeps every event in order. When a phone connects, it first receives every past
 event (catch-up), then each new one as it happens. The phone never asks for anything else.
@@ -85,9 +85,17 @@ event (catch-up), then each new one as it happens. The phone never asks for anyt
 ### 4. How the mind map grows
 
 Every 45 s, if at least 15 new words were said or written, `MindMapper` (`mindmap.ts`) sends
-Claude the current outline plus only the new text. Claude returns the outline with new topics
-added. It is told never to remove or reword existing nodes, so the map grows without jumping
-around. The phone draws the outline as a mind map (Markmap, in the Lovable app).
+Claude the current map plus only the new text. Claude returns **only the changes** (new topics,
+and new details or links on existing ones), and the server merges them in. The server, not the
+model, guarantees topics never disappear, move or get reworded.
+
+**Relatedness:** each topic gets a score for how closely it relates to the lecture's main
+subject: 1 = the subject itself, 0.7–0.9 a direct part of it, 0.4–0.6 background or an
+application, 0.1–0.3 a tangent. Topics can also link to each other with a strength. The student
+app uses this to place topics: core topics near the centre, tangents near the edge, linked topics
+next to each other. **We compute the scores (understanding the lecture); Person 2's app does the
+placement (drawing).** Tested: core topic 0.8, a historical aside and a sports application 0.5,
+an unrelated aside about octopuses 0.1.
 
 ### 5. Explanation settings: two layers (`settings.ts`)
 
@@ -128,7 +136,7 @@ Each row is something you can point to in the code and explain.
 | Auto-capture only sends useful photos | Compares tiny 160×90 grayscale frames twice a second. Sends only when the picture has been **still for 2 s** (teacher stepped away), **differs from the last photo** (new writing), and **5 s** have passed. A few photos a minute instead of 30 frames a second | `public/teach.js` |
 | Photos shrunk before upload | ≤1280 px JPEG at 80% quality: a 16:9 photo is ~1,200 image tokens, ~1,900 with the prompt (about $0.01 a read), and uploads fast | `public/teach.js` `captureBoard` |
 | Latest photo wins | While one board read runs, newer photos replace each other in a single waiting slot. A burst of captures costs at most two calls and is never read out of order | `board.ts` `submit`/`drain` |
-| Incremental mind map | Sends the outline plus only the new text, so the prompt stays the same size however long the lecture runs; skipped entirely when under 15 new words | `mindmap.ts` |
+| Incremental mind map | Sends the map plus only the new text, and Claude replies with only the changes (measured: 72 then 191 output tokens), so the reply doesn't grow with the map; skipped entirely when under 15 new words | `mindmap.ts` `merge` |
 | Explain once | Phrases already explained are passed to Claude and filtered out, so "discriminant" isn't explained ten times | `annotate.ts` `explained` |
 | Flat prompt size | Only the 40 most recent explained phrases are sent; older repeats are caught on the server. Without this cap, every call grew a little all lecture (measured: 715 → 953 tokens over 16 sentences) | `annotate.ts` `EXPLAINED_SENT` |
 | Teacher can switch explanations off | With idioms and terms both off, the per-sentence AI call is skipped entirely (verified: zero calls); "Only tricky" cuts reply size from ~110 to ~11 tokens on sentences with nothing tricky | `annotate.ts` `add`, `settings.ts` |
@@ -247,7 +255,8 @@ server/
   src/mindmap.ts    Incremental mind map outline
   src/replay.ts     Play a saved event list with original timing
   src/config.ts     Settings and API keys from wie_hack/.env
-  public/teach.*    Teacher console (mic, camera, auto-capture, controls)
+  public/teach.*    Teacher console: camera with capture and auto-capture, mic with live level
+                    meter and LIVE badge, explanation settings, replay/save/reset, live preview
   public/viewer.html Test viewer: Feed tab (captions, notes, board with KaTeX) and Mind map tab
                     (drawn live with markmap), plus the per-student explanation filter
   mock/lecture.json Demo lecture (same as the Lovable mock data)
@@ -267,26 +276,49 @@ npm run dev                     # from server/: restarts on file changes
 - On a phone before the Lovable app is wired up: `cloudflared tunnel --url http://localhost:3001`, then
   open `https://<random>.trycloudflare.com/teach/viewer.html` (or `/teach/` for the camera).
 
-### Connecting the Lovable app
+### The student app (Lovable)
 
-In the Lovable repo's `vite.config.ts`, proxy our routes to the server and allow the tunnel host
-(Vite rejects unknown hostnames otherwise):
+Repo: `chengrace086-ux/lecture-lens` (Person 2), cloned into `wie_hack/web` (ignored by our repo).
+It's a TanStack Start app on Lovable's Vite wrapper. Its `src/lib/events.ts` already speaks our
+event format and connects to `/ws` in live mode, so the only change on our side is the proxy in
+`web/vite.config.ts` (passed through the wrapper's `vite:` option):
 
 ```ts
-server: {
-  host: "::",
-  port: 8080,
-  allowedHosts: [".trycloudflare.com"],
-  proxy: {
-    "/ws": { target: "ws://localhost:3001", ws: true },
-    "/api": "http://localhost:3001",
-    "/teach": "http://localhost:3001",
+vite: {
+  server: {
+    allowedHosts: [".trycloudflare.com"],   // Vite rejects unknown hostnames otherwise
+    proxy: {
+      "/ws": { target: "ws://localhost:3001", ws: true },
+      "/api": "http://localhost:3001",
+      "/teach": "http://localhost:3001",
+    },
   },
 },
 ```
 
-Then tunnel the Vite port instead (`cloudflared tunnel --url http://localhost:8080`) and open
-`/?mode=live` on phones. One URL serves the student app, the teacher console and the feed.
+Lovable's own sandbox strips the proxy, so its preview keeps using mock data.
+
+**Install** (once): `npm install` fails on this project (an npm bug with its package
+overrides), so use bun, which installs the exact versions in its `bun.lock`:
+
+```bash
+cd web && npx -y bun@1.4.3 install --frozen-lockfile
+```
+
+**Run everything** (or use the `lecture-server` and `student-app` entries in `.claude/launch.json`):
+
+```bash
+npm run dev --prefix server     # lecture server, port 3001
+npm run dev --prefix web        # student app, port 8080
+cloudflared tunnel --url http://localhost:8080
+```
+
+On phones open `https://<random>.trycloudflare.com/?mode=live`. The same address serves the
+teacher console at `/teach/`.
+
+**Ownership rule:** Person 2 owns every screen and component. We only touch `vite.config.ts`
+(and `src/lib/events.ts` if the connection ever needs changing), and always `git pull` first,
+because Lovable commits to `main` directly.
 
 ## Status
 
@@ -319,13 +351,28 @@ cloudflared address and its camera captures were read by Claude (2 reads: 3.0 s,
 dense printed page with ~1,700 output tokens, about $0.05; a whiteboard has far less text). The
 public address also served the live feed over a secure WebSocket.
 
-**Not verified yet:** a real handwritten whiteboard, auto-capture thresholds, the Lovable app in
-live mode.
+**Student app in live mode (2026-11-07):** the Lovable app at `/?mode=live` rendered the server's
+captions, underlined idiom/term phrases, board cards (photos loaded through the proxy), KaTeX
+equations, the LIVE indicator, and its Mind map tab drew the server's outline. Verified locally
+and through a tunnel to port 8080 (app, `/teach/`, `/api` and the `/ws` feed all on one address).
+The app doesn't use the annotation `level` yet (follow-up prompt in `LOVABLE_PROMPT.md`).
+
+**Not verified yet:** a real handwritten whiteboard, auto-capture thresholds.
 
 **Known quirk:** two sentences annotated at the same moment can't see each other's explanations,
 so a closely related phrase may get explained twice ("discriminant", then "negative discriminant").
 
 ## Changelog
+
+- **2026-11-07:** Mind map topics now carry `relatedness` (0–1) and `links`; Claude returns only
+  changes and the server merges them (topics never disappear or move). Demo lecture gains
+  relatedness data and a tangent topic; Lovable follow-up prompt 2 describes the radial layout.
+  Teacher console redesigned (card layout, status chips, mic level meter, LIVE badge, links to
+  the student app and join page); all element ids and behaviour unchanged.
+
+- **2026-11-07:** Connected the student app (`chengrace086-ux/lecture-lens`, cloned into `web/`):
+  added the Vite proxy and tunnel host, documented install (bun) and how to run both apps;
+  verified live mode locally and over the tunnel.
 
 - **2026-11-07:** Test viewer gets a Mind map tab that draws the outline as a live tree with
   markmap (d3 7.9.0, markmap 0.18.12 from jsDelivr; falls back to plain text if they can't load).
