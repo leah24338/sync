@@ -10,13 +10,13 @@
 | Team | 2 people: Person 1 = pipeline (local, with Claude Code), Person 2 = student app (Lovable). **TODO**: put names on the roles |
 | MVP scope | Decided, trimmed for two people (below) |
 | Student app | Proposed: built in Lovable (100 credits), synced to GitHub, cloned into `web/` |
-| Server + teacher page | Node + Express + ws (TypeScript), written locally in `server/` |
+| Server + teacher page | **Built (v1)** in `server/`, tested with the demo replay. Not yet tested with real keys. How it works and why: `ARCHITECTURE.md` |
 | Runtime AI | Claude Opus 5.5 (`claude-opus-5-5`) called from our server. Lovable's built-in AI is **not** used |
 | Speech-to-text | Deepgram streaming (AssemblyAI as backup) |
 | Tunnel | cloudflared quick tunnel (ngrok as backup) |
 | Primary persona | **TODO**: pick one (e.g. first-semester international student, or hard-of-hearing student) |
 | Hackathon length / deadline | **TODO**: fill in, then adjust the timeline below |
-| Repos | **TODO**: Lovable project → GitHub; this folder → its own repo |
+| Repos | This folder: GitHub `leah24338/sync` (`main`). Server code not committed yet. **TODO**: Lovable project → its own GitHub repo |
 
 ## The product in one sentence
 
@@ -131,6 +131,7 @@ event, then streams new ones. Student app uses live mode with `?mode=live`, othe
 ```
 wie_hack/              # this folder: its own git repo (ignores web/)
   PLAN.md
+  ARCHITECTURE.md      # how the server works + optimizations (keep updated)
   LOVABLE_PROMPT.md    # first prompt to paste into Lovable
   .env                 # API keys — never commit
   .env.example
@@ -140,7 +141,8 @@ wie_hack/              # this folder: its own git repo (ignores web/)
     src/board.ts       # Claude vision → board state
     src/annotate.ts    # Claude figurative-language notes
     src/mindmap.ts     # Claude mind map outline
-    public/teach.html  # teacher page: mic + camera + "Capture board"
+    src/replay.ts      # replay the demo lecture or a saved session
+    public/            # teacher console (mic, camera, capture) + test viewer
     mock/lecture.json  # sample event stream
   web/                 # git clone of the Lovable GitHub repo (separate repo)
 ```
@@ -219,6 +221,7 @@ If the checkpoint slips, cut the mind map and auto board capture first.
 
 - [ ] Anthropic API key + credits (console.anthropic.com) → `ANTHROPIC_API_KEY` in `.env`
 - [ ] Deepgram API key (console.deepgram.com) → `DEEPGRAM_API_KEY` in `.env`
+- [ ] `cp .env.example .env` in the project folder, then paste both keys into `.env`
 - [ ] `brew install cloudflared`
 - [ ] Ask organizers about sponsor API credits
 - [ ] Lovable: redeem the 100 credits, create the project from `LOVABLE_PROMPT.md`,

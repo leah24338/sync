@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Test viewer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <style>
+    :root { --bg: #fff; --ink: #1c1c1a; --muted: #8a8a84; --line: #e2e2dc; --idiom: #8a4b00; --term: #2457d6; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --ink: #ededea; --muted: #8f8f88; --line: #34342f; --idiom: #ffb35c; --term: #7aa2ff; } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+    header { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 16px; font-size: 13px; color: var(--muted); }
+    #feed { padding: 8px 16px 40px; display: grid; gap: 10px; }
+    .caption.partial { color: var(--muted); font-style: italic; }
+    .note { font-size: 14px; margin: 2px 0 0 12px; }
+    .note.idiom b { color: var(--idiom); } .note.term b { color: var(--term); }
+    .board, .mindmap { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+    .board img { max-width: 160px; float: right; margin-left: 10px; border-radius: 4px; }
+    .board::after { content: ""; display: block; clear: both; }
+    .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    pre { margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; }
+  </style>
+</head>
+<body>
+<header id="status">Connecting…</header>
+<div id="feed"></div>
+<script>
+  // Bare-bones student view for testing the server before the Lovable app is wired up.
+  const feed = document.getElementById("feed");
+  const status = document.getElementById("status");
+  let count = 0;
+  let captions = new Map();
+  let retry = 500;
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function renderMath(target, latex) {
+    if (window.katex) katex.render(latex, target, { throwOnError: false, displayMode: true });
+    else target.textContent = latex;
+  }
+
+  function handle(event) {
+    count++;
+    if (event.type === "caption") {
+      let entry = captions.get(event.id);
+      if (!entry) {
+        entry = { box: el("div"), text: el("div", "caption") };
+        entry.box.append(entry.text);
+        captions.set(event.id, entry);
+        feed.append(entry.box);
+      }
+      entry.text.textContent = event.text;
+      entry.text.className = event.final ? "caption" : "caption partial";
+    } else if (event.type === "annotation") {
+      const entry = captions.get(event.captionId);
+      const note = el("div", `note ${event.kind}`);
+      note.append(el("b", "", `${event.kind === "idiom" ? "Idiom" : "Term"}: “${event.phrase}”`), ` — ${event.meaning}`);
+      (entry ? entry.box : feed).append(note);
+    } else if (event.type === "board") {
+      const card = el("div", "board");
+      card.append(el("div", "label", "Board (AI transcribed)"));
+      const img = el("img");
+      img.src = event.snapshotUrl;
+      img.alt = "Whiteboard photo";
+      card.append(img);
+      for (const block of event.blocks) {
+        const row = el("div");
+        if (block.kind === "equation") renderMath(row, block.content);
+        else row.textContent = block.content;
+        card.append(row);
+      }
+      feed.append(card);
+    } else if (event.type === "mindmap") {
+      const box = el("div", "mindmap");
+      box.append(el("div", "label", "Mind map update"), el("pre", "", event.markdown));
+      feed.append(box);
+    }
+    status.textContent = `Live · ${count} events`;
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  function connect() {
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    ws.onopen = () => {
+      // The server re-sends the whole lecture on every connect, so start from a clean slate.
+      feed.replaceChildren();
+      captions = new Map();
+      count = 0;
+      retry = 500;
+      status.textContent = "Live · waiting for events";
+    };
+    ws.onmessage = (e) => handle(JSON.parse(e.data));
+    ws.onclose = () => {
+      status.textContent = "Reconnecting…";
+      setTimeout(connect, retry);
+      retry = Math.min(retry * 2, 8000);
+    };
+  }
+  connect();
+</script>
+</body>
+</html>

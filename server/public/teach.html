@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Teacher console</title>
+  <style>
+    :root { --bg: #f7f7f5; --card: #fff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e2e2dc; --accent: #2457d6; --ok: #1f8a4c; --bad: #c0362c; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #161615; --card: #1f1f1d; --ink: #ededea; --muted: #a0a09a; --line: #34342f; --accent: #7aa2ff; --ok: #4cc27f; --bad: #ff7a6e; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+    main { max-width: 900px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+    h1 { font-size: 22px; margin: 4px 0 0; }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    button, select { font: inherit; min-height: 44px; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer; }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .status { color: var(--muted); font-size: 14px; margin-top: 8px; }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
+    .on { color: var(--ok); } .off { color: var(--bad); }
+    video { width: 100%; max-height: 50vh; background: #000; border-radius: 8px; margin-top: 8px; }
+    label { display: inline-flex; gap: 6px; align-items: center; min-height: 44px; }
+    iframe { width: 100%; height: 480px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+    code { font-size: 13px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Teacher console</h1>
+    <div class="status" id="serverStatus">Connecting…</div>
+  </header>
+
+  <section>
+    <h2>1. Microphone → live captions</h2>
+    <div class="row">
+      <button class="primary" id="micStart">Start mic</button>
+      <button id="micStop" disabled>Stop mic</button>
+    </div>
+    <div class="status" id="micStatus">Mic off. Use Chrome, Edge or Firefox for the mic.</div>
+  </section>
+
+  <section>
+    <h2>2. Camera → whiteboard</h2>
+    <div class="row">
+      <button class="primary" id="camStart">Start camera</button>
+      <button id="capture" disabled>Capture board</button>
+      <label><input type="checkbox" id="auto" /> Auto-capture when the board changes</label>
+    </div>
+    <video id="video" playsinline muted hidden></video>
+    <div class="status" id="boardStatus">Camera off. On a phone, open this page through the tunnel URL (camera needs HTTPS).</div>
+    <div class="status"><code id="meter"></code></div>
+  </section>
+
+  <section>
+    <h2>3. Lecture</h2>
+    <div class="row">
+      <button id="replayMock">Replay demo lecture</button>
+      <select id="sessions"><option value="">Saved sessions…</option></select>
+      <button id="replaySession">Replay session</button>
+      <button id="replayStop">Stop replay</button>
+      <button id="save">Save session</button>
+      <button id="reset">Reset lecture</button>
+    </div>
+    <div class="status" id="lectureStatus"></div>
+  </section>
+
+  <section>
+    <details open>
+      <summary><strong>What students receive</strong> (test viewer)</summary>
+      <iframe src="viewer.html" title="Test viewer"></iframe>
+    </details>
+  </section>
+</main>
+<script src="teach.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+.env
+.DS_Store
+# The Lovable app is its own git repo, cloned here.
+web/
+# Recorded lectures (may contain students' voices turned into text).
+server/sessions/
