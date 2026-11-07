@@ -139,6 +139,21 @@
     #meter { display: block; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); margin-top: 8px; }
     #meter:empty { display: none; }
 
+    /* Students lost */
+    .lost-total { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+    #lostTotal { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    #lostCard.alert #lostTotal { color: var(--live); }
+    .lost-list { display: grid; gap: 10px; }
+    .lost-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; font-size: 14px; }
+    .lost-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lost-row .count { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .lost-row .bar { grid-column: 1 / -1; height: 8px; border-radius: 999px; background: var(--soft); overflow: hidden; }
+    .lost-row .bar span { display: block; height: 100%; background: var(--live); border-radius: inherit; }
+    .lost-row.now strong::after { content: " · now"; color: var(--accent); font-weight: 600; }
+    #lostMomentsWrap { margin-top: 16px; display: grid; gap: 8px; }
+    .moments { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 14px; }
+    .moments .when { font-weight: 700; font-variant-numeric: tabular-nums; }
+
     /* Preview */
     #previewCard iframe { width: 100%; height: min(72vh, 720px); min-height: 460px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 
@@ -245,6 +260,20 @@
     </div>
     <code id="meter"></code>
     <div class="status" id="boardStatus" role="status">On a phone, open this page through the https address so the camera works.</div>
+  </section>
+
+  <section class="card" id="lostCard" aria-labelledby="lostTitle">
+    <div class="card-head">
+      <h2 id="lostTitle">Students lost</h2>
+      <p class="hint">Anonymous · last 10 minutes</p>
+    </div>
+    <div class="lost-total"><span id="lostTotal">0</span><span class="muted" id="lostTotalLabel">students have pressed "I'm lost"</span></div>
+    <p class="hint" id="lostEmpty">When students press "I'm lost", you'll see which topics and moments confused them.</p>
+    <div id="lostTopics" class="lost-list" aria-label="Lost by topic"></div>
+    <div id="lostMomentsWrap" hidden>
+      <span class="group-label">Most confusing moments</span>
+      <ol id="lostMoments" class="moments"></ol>
+    </div>
   </section>
 
   <details class="card tools" id="toolsCard">

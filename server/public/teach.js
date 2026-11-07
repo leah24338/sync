@@ -495,20 +495,39 @@ function showFocus() {
 
 function watchFeed() {
   const ws = new WebSocket(`${wsBase}/ws?role=preview`);
+  let openedAt = 0;
   ws.onopen = () => {
+    openedAt = Date.now();
     boardContent = new Set();
     topicLabels = new Map();
     focusId = null;
+    lostFlags = [];
+    captionText = new Map();
+    renderLost();
   };
   ws.onmessage = (e) => {
     const event = JSON.parse(e.data);
+    tickClock(event);
     if (event.type === "mindmap") {
       topicLabels = new Map((event.topics ?? []).map((t) => [t.id, t.label]));
       showFocus();
+      renderLost();
     } else if (event.type === "focus") {
       focusId = event.topicId;
       showFocus();
+      renderLost();
+    } else if (event.type === "lost") {
+      lostFlags.push(event);
+      renderLost();
+      // Events in the first moment after connecting are the catch-up history, not new presses.
+      if (Date.now() - openedAt > 1500) {
+        const where = topicLabels.get(event.topicId);
+        toast(where ? `A student is lost on “${where}”` : "A student pressed “I'm lost”");
+        $("lostCard").classList.add("alert");
+        setTimeout(() => $("lostCard").classList.remove("alert"), 4000);
+      }
     } else if (event.type === "caption") {
+      if (event.final) captionText.set(event.id, event.text);
       $("nowCaption").textContent = event.text;
       $("nowCaption").classList.toggle("partial", !event.final);
     } else if (event.type === "board") {
@@ -525,6 +544,78 @@ function watchFeed() {
   ws.onclose = () => setTimeout(watchFeed, 2000);
 }
 watchFeed();
+
+// ---------- Students lost ----------
+// "I'm lost" presses arrive as anonymous `lost` events. Counts cover the last 10 minutes of the
+// lecture clock (the latest event time, advanced in real time between events).
+
+const LOST_WINDOW_MS = 10 * 60_000;
+let lostFlags = [];
+let captionText = new Map();
+let clock = { lecture: 0, at: Date.now() };
+
+function tickClock(event) {
+  const t = Math.max(event.t ?? 0, event.at ?? 0);
+  if (t > clock.lecture) clock = { lecture: t, at: Date.now() };
+}
+const lectureNow = () => clock.lecture + (Date.now() - clock.at);
+const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+
+function renderLost() {
+  const recent = lostFlags.filter((f) => lectureNow() - f.at < LOST_WINDOW_MS);
+  $("lostTotal").textContent = recent.length;
+  $("lostTotalLabel").textContent = recent.length === 1 ? 'student has pressed "I\'m lost"' : 'students have pressed "I\'m lost"';
+  $("lostEmpty").hidden = recent.length > 0;
+
+  // By topic (flags with no topic are grouped as "Not on the mind map yet").
+  const byTopic = new Map();
+  for (const f of recent) {
+    const key = f.topicId && topicLabels.has(f.topicId) ? f.topicId : "";
+    byTopic.set(key, (byTopic.get(key) ?? 0) + 1);
+  }
+  const rows = [...byTopic].sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...rows.map(([, n]) => n));
+  $("lostTopics").replaceChildren(
+    ...rows.map(([id, n]) => {
+      const row = document.createElement("div");
+      row.className = `lost-row${id && id === focusId ? " now" : ""}`;
+      const label = document.createElement("strong");
+      label.textContent = id ? topicLabels.get(id) : "Not on the mind map yet";
+      const count = document.createElement("span");
+      count.className = "count";
+      count.textContent = `${n} lost`;
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.innerHTML = `<span style="width:${Math.round((n / max) * 100)}%"></span>`;
+      row.append(label, count, bar);
+      return row;
+    }),
+  );
+
+  // Top moments: 30-second slices of the lecture with the most presses, and what was being said.
+  const byMoment = new Map();
+  for (const f of recent) {
+    const slice = Math.floor(f.t / 30_000);
+    const m = byMoment.get(slice) ?? { t: f.t, n: 0, captionId: f.captionId };
+    m.n++;
+    if (f.t < m.t) Object.assign(m, { t: f.t, captionId: f.captionId });
+    byMoment.set(slice, m);
+  }
+  const moments = [...byMoment.values()].sort((a, b) => b.n - a.n).slice(0, 3);
+  $("lostMomentsWrap").hidden = moments.length === 0;
+  $("lostMoments").replaceChildren(
+    ...moments.map((m) => {
+      const li = document.createElement("li");
+      const when = document.createElement("span");
+      when.className = "when";
+      when.textContent = mmss(m.t);
+      const said = captionText.get(m.captionId);
+      li.append(when, ` · ${m.n} lost${said ? ` · “${said.length > 70 ? `${said.slice(0, 70)}…` : said}”` : ""}`);
+      return li;
+    }),
+  );
+}
+setInterval(renderLost, 15_000); // let old presses age out of the 10-minute window
 
 // ---------- Keyboard and presentation clicker ----------
 // Clickers send Page Down / arrow keys (and "b"), so the teacher can capture from across the room.

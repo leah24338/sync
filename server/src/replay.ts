@@ -20,25 +20,28 @@ export async function replayFile(log: EventLog, file: string, speed = 1): Promis
   let lastT = firstT;
   for (const event of events) {
     // Annotations have no timestamp of their own; they play right after their caption.
-    if ("t" in event) lastT = event.t;
+    // "I'm lost" presses play when they were pressed (`at`), not at the moment they point to.
+    if (event.type === "lost") lastT = event.at;
+    else if ("t" in event) lastT = event.t;
     const offset = lastT - firstT;
-    timers.push(
-      setTimeout(() => log.push(retime(event, prefix, startedAt + offset)), offset / speed),
-    );
+    const shift = (t: number) => startedAt + (t - firstT);
+    timers.push(setTimeout(() => log.push(retime(event, prefix, shift)), offset / speed));
   }
   return () => timers.forEach(clearTimeout);
 }
 
-function retime(event: LectureEvent, prefix: string, t: number): LectureEvent {
+function retime(event: LectureEvent, prefix: string, shift: (t: number) => number): LectureEvent {
   switch (event.type) {
     case "caption":
-      return { ...event, id: prefix + event.id, t };
+      return { ...event, id: prefix + event.id, t: shift(event.t) };
     case "annotation":
       return { ...event, captionId: prefix + event.captionId };
     case "board":
-      return { ...event, id: prefix + event.id, t };
+      return { ...event, id: prefix + event.id, t: shift(event.t) };
     case "mindmap":
     case "focus":
-      return { ...event, t };
+      return { ...event, t: shift(event.t) };
+    case "lost":
+      return { ...event, t: shift(event.t), at: shift(event.at), captionId: event.captionId && prefix + event.captionId };
   }
 }
