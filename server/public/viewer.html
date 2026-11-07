@@ -14,7 +14,7 @@
   <style>
     :root { --bg: oklch(0.992 0.008 85); --ink: oklch(0.27 0.06 30); --muted: oklch(0.47 0.04 35); --line: oklch(0.32 0.08 28 / 0.14);
       --idiom: oklch(0.5 0.1 10); --term: oklch(0.45 0.1 265); --accent: oklch(0.32 0.08 28); }
-    @media (prefers-color-scheme: dark) { :root { --bg: oklch(0.225 0.014 250); --ink: oklch(0.93 0.008 85); --muted: oklch(0.74 0.015 250);
+    @media all { :root.dark { --bg: oklch(0.225 0.014 250); --ink: oklch(0.93 0.008 85); --muted: oklch(0.74 0.015 250);
       --line: oklch(0.36 0.014 250); --idiom: oklch(0.8 0.12 65); --term: oklch(0.8 0.1 260); --accent: oklch(0.78 0.1 200); } }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Atkinson Hyperlegible", system-ui, sans-serif; }
     header { position: sticky; top: 0; z-index: 1; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -207,6 +207,9 @@
       const s = Math.floor(event.t / 1000);
       const where = topicLabels.get(event.topicId);
       feed.append(el("div", "mapline", `⚑ A student is lost at ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}${where ? ` (${where})` : ""}`));
+    } else if (event.type === "addressed") {
+      const where = topicLabels.get(event.topicId);
+      feed.append(el("div", "mapline", `✓ Your teacher went over ${where ? `“${where}”` : "what students were lost on"}`));
     } else if (event.type === "mindmap") {
       topicLabels = new Map((event.topics ?? []).map((t) => [t.id, t.label]));
       showFocus();

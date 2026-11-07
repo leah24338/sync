@@ -40,6 +40,7 @@ function retime(event: LectureEvent, prefix: string, shift: (t: number) => numbe
       return { ...event, id: prefix + event.id, t: shift(event.t) };
     case "mindmap":
     case "focus":
+    case "addressed":
       return { ...event, t: shift(event.t) };
     case "lost":
       return {

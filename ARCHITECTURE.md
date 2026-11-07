@@ -55,7 +55,8 @@ There are four kinds of event (the same contract the Lovable app uses):
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
 | `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
 | `board` | The whole cleaned-up whiteboard at that moment, plus a link to the photo. Each line: `content` (LaTeX for equations; words with any maths in `$…$` for text), `plain` (readable Unicode) and `spoken` (words for screen readers). |
-| `lost` | A student pressed "I'm lost" (anonymous): `t` (the moment they were lost at), `at` (when they pressed), `topicId`, `captionId` (what was being said), `highlights` (exact words they marked, verified). |
+| `lost` | A student pressed "I'm lost" (anonymous): `t` (the moment they were lost at), `at` (when they pressed), `topicId`, `captionId` (what was being said), `highlights` (exact words they marked, verified), `student` (an anonymous token, the same for one phone within one lecture, so screens count students rather than presses). |
+| `addressed` | The teacher went over what students were lost on: `t`, and `topicId` (or `moment`, a 30 s slice, for presses with no topic; neither = everything). Presses before it stop counting as "lost right now". |
 | `focus` | Which mind map topic the teacher is talking about right now (`topicId`). Only sent when it changes; the log keeps just the latest one. |
 | `mindmap` | The whole mind map: `title` (the main subject), `topics` (each with a `relatedness` score 0–1, `details` and `links` to other topics), and the same map as a Markdown outline (`markdown`) for simple tree views. |
 
@@ -138,8 +139,10 @@ The one place students send something to the server:
 3. The server fills in the topic the teacher was on at moment `t` (from the focus history) when the
    student didn't pick one, and what was being said then. It ignores the same phone flagging the same
    thing again within 2 minutes, allows up to 3 presses per phone in any 10 s, and broadcasts a `lost`
-   event (with the highlights) to every screen.
-4. It replies with how many students are lost on that topic (last 10 min), so the student sees
+   event (with the highlights) to every screen. The event carries a `student` token: a salted hash of
+   the phone's id with a new random salt every lecture, so screens can count students without anyone
+   being able to trace it back to a phone.
+4. It replies with how many students are lost on that topic **right now**, so the student sees
    "you're not alone", plus a **personal catch-up** (`catchup.ts`): a 2-line summary of the last
    3 minutes before that moment and up to 3 things the teacher assumed students knew, each explained
    in one sentence. Claude writes it from the transcript, the board and the mind map topic. The flag
@@ -147,15 +150,31 @@ The one place students send something to the server:
    lost within the same 30 seconds on the same topic get the same catch-up, so a whole class lost at
    one point costs one call (about a cent). Tested: first student 4.5 s, the second at the same moment
    7 ms with the identical catch-up.
-5. The teacher console's **Students lost** panel shows the total for the last 10 minutes, a bar per
-   topic (the current topic is marked "now"), the **words students highlighted** with counts, the most
-   confusing moments with the caption at that time, and an alert toast as each press arrives.
-6. The catch-up focuses on the highlighted words when there are any.
+5. The teacher console's **Students lost** card (top right, always on screen beside the lecture
+   controls) shows one big number: **students lost right now** (unique students, not presses), "of N
+   joined" with a bar, and a red "Many students are lost. Consider pausing" once it's a quarter of the
+   class. Below it, one list of where they're lost: each topic with its student count, the words
+   students highlighted there (chips, with counts), or what the teacher was saying, and a "Now" tag on
+   the current topic. The count also shows in the top bar and the browser tab title ("(3 lost)"), for a
+   teacher presenting from another window. A new press briefly outlines the card instead of a popup.
+6. **Closing the loop:** each topic has an **Addressed** button (and **Clear all**). It sends
+   `POST /api/lost/addressed`, which adds an `addressed` event: those students stop counting, and
+   students' screens say "Your teacher went over …". A student who is still lost presses again and
+   counts again.
+7. "Right now" means pressed in the last **5 minutes** and not addressed since. The server's reply to
+   the student and the teacher's card use the same rule.
+8. The catch-up focuses on the highlighted words when there are any.
 
 `/api/lost` allows cross-site requests, so Lovable's own preview (on its own domain) can send flags
 too. Tested: automatic topic (a press "now" → Quadratic formula, a press pointing at 0:16 →
 Definition), counts, the duplicate and rate limits, cross-site access via the server tunnel, and the
 panel with the demo lecture's sample presses.
+
+Tested end to end (2026-11-07): demo replay plus three simulated phones through `/api/lost` (one
+pressing twice) → the card showed 6 students across 5 topics, with repeat presses not double
+counted; Addressed on "Discriminant" removed it, the test viewer showed "✓ Your teacher went over
+'Discriminant'", and a new press on it afterwards counted 1 (the reply to that student said 1 too);
+Clear all → 0, pill and tab title cleared. Checked at desktop and phone width.
 
 ### 5. Explanation settings: two layers (`settings.ts`)
 
@@ -310,6 +329,7 @@ Built so a teacher needs one button:
 | **End lecture** | Stops the devices and saves the lecture automatically, so it can be replayed later |
 | **Board source: Camera or Screen share** | Camera points at a whiteboard. Screen share captures slides or a digital whiteboard from the teacher's computer (desktop browsers only), turns auto-capture on (key presses go to the slides app, not the console), sends larger images (1600 px) for small slide text, and stops cleanly when sharing ends from the browser bar. The board reader ignores window frames, toolbars, slide numbers and the cursor |
 | **Capture board** (or `Space`, `→`, Page Down, or a presentation clicker) | Flash, "photo sent", then "Board read ✓ 2 new lines" once Claude has read it, or "no new writing found" |
+| **Students lost** | Top right, always visible: big "students lost right now" number, where they're lost, Addressed buttons (see "I'm lost" above). Also a count in the top bar and tab title |
 | **Show join code** | QR code and link for students; warns when the console is opened on `localhost`, which phones can't reach |
 | **Device pickers** | Appear only when there's more than one mic or camera (clip-on mic, USB webcam) |
 | **Settings & tools** (collapsed) | Explanation settings, replaying the demo or a saved lecture (listed by date), save now, clear for everyone |
@@ -336,6 +356,7 @@ Server → page: `{"type":"status","state":"connecting|open|closed|error","messa
 | `GET /api/status` | Viewer count, event count, whether Claude/Deepgram keys are set |
 | `GET /api/settings` · `POST /api/settings` | Explanation settings: `{"idioms":"off|tricky|standard|all","terms":"…"}` (either field optional) |
 | `POST /api/board` | Body: a JPEG. Queues a board read (202) |
+| `POST /api/lost/addressed` | Teacher: `{ topicId? , moment? }` (neither = everything). Adds an `addressed` event |
 | `POST /api/lost` | `{ clientId, t?, topicId?, highlights? }` from a student's phone (`highlights`: `[{ source: "feed"|"board", sourceId, text }]`). Returns `{ ok, duplicate, t, topicId?, highlights, students, catchUp }` (`catchUp`: `{ summary: [2 lines], assumed: [{ term, explanation }] }` or null); 429 after 3 presses in 10 s. Open to any site |
 | `GET /api/snapshots/:id` | A stored board photo |
 | `POST /api/replay` | `{}` for the demo lecture, or `{"session":"<file>","speed":2}` |
@@ -478,6 +499,14 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** "I'm lost" end to end, teacher side rebuilt: one big "students lost right now"
+  number (unique students via an anonymous per-lecture `student` token, 5-minute window), one list of
+  topics with highlighted words, **Addressed** / **Clear all** (`POST /api/lost/addressed`, new
+  `addressed` event, students' screens are told), count in the top bar and tab title. Less clutter:
+  the card sits beside the lecture controls in its own column, the top bar shows a status chip only
+  when something's wrong, no popup per press, the auto-capture debug numbers only with `?debug`.
+  Demo presses carry `student` tokens. Lovable prompt 9.
 
 - **2026-11-07:** The student app moved to a new Lovable project, `leah24338/project-migration-hub`;
   `web/` now pulls from it and no longer from the old repo. Its first commit was a copy of an older

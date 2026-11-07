@@ -42,23 +42,29 @@ function friendlyError(error, device) {
 
 // ---------- Status ----------
 
+// The top bar only shows a status chip when something needs fixing.
 async function refreshStatus() {
   try {
     const s = await fetch("/api/status").then((r) => r.json());
-    const chip = (on, okText, offText, offHelp) =>
-      `<span class="chip ${on ? "ok" : "bad"}" title="${on ? "Ready" : offHelp}">${on ? okText : offText}</span>`;
-    const joined = `${s.students} student${s.students === 1 ? "" : "s"} joined`;
-    $("serverStatus").innerHTML =
-      chip(s.deepgram, "Captions ready", "Captions off", "Add DEEPGRAM_API_KEY to .env") +
-      chip(s.claude, "AI notes ready", "AI notes off", "Add ANTHROPIC_API_KEY to .env") +
-      `<span class="chip">${joined}</span>`;
-    $("studentCount").textContent = joined;
+    const problems = [
+      !s.deepgram && '<span class="chip bad" title="Add DEEPGRAM_API_KEY to .env">Captions off</span>',
+      !s.claude && '<span class="chip bad" title="Add ANTHROPIC_API_KEY to .env">AI notes off</span>',
+    ].filter(Boolean);
+    $("serverStatus").innerHTML = problems.join("");
+    if (s.students !== joined) {
+      joined = s.students;
+      renderLost();
+    }
+    $("studentCount").textContent = `${joined} student${joined === 1 ? "" : "s"} joined`;
   } catch {
     $("serverStatus").innerHTML = '<span class="chip bad">Server unreachable</span>';
   }
 }
 refreshStatus();
 setInterval(refreshStatus, 3000);
+
+if (new URLSearchParams(location.search).has("debug")) document.body.classList.add("debug");
+if (new URLSearchParams(location.search).has("dark")) document.documentElement.classList.add("dark");
 
 // ---------- Start / end lecture ----------
 
@@ -502,6 +508,7 @@ function watchFeed() {
     topicLabels = new Map();
     focusId = null;
     lostFlags = [];
+    addressed = new Map();
     captionText = new Map();
     renderLost();
   };
@@ -521,12 +528,14 @@ function watchFeed() {
       renderLost();
       // Events in the first moment after connecting are the catch-up history, not new presses.
       if (Date.now() - openedAt > 1500) {
-        const where = topicLabels.get(event.topicId);
-        const words = event.highlights?.[0]?.text;
-        toast(words ? `A student is lost on “${words}”` : where ? `A student is lost on “${where}”` : "A student pressed “I'm lost”");
-        $("lostCard").classList.add("alert");
-        setTimeout(() => $("lostCard").classList.remove("alert"), 4000);
+        const card = $("lostCard");
+        card.classList.remove("ping");
+        void card.offsetWidth; // restart the animation
+        card.classList.add("ping");
       }
+    } else if (event.type === "addressed") {
+      addressed.set(addressedKey(event), event.t);
+      renderLost();
     } else if (event.type === "caption") {
       if (event.final) captionText.set(event.id, event.text);
       $("nowCaption").textContent = event.text;
@@ -547,12 +556,18 @@ function watchFeed() {
 watchFeed();
 
 // ---------- Students lost ----------
-// "I'm lost" presses arrive as anonymous `lost` events. Counts cover the last 10 minutes of the
-// lecture clock (the latest event time, advanced in real time between events).
+// "I'm lost" presses arrive as anonymous `lost` events. A student counts as lost right now for
+// 5 minutes after pressing (the server uses the same window), or until the teacher marks that topic
+// addressed. Each press carries an anonymous per-lecture `student` token, so these are students,
+// not presses. Times use the lecture clock (the latest event time, advanced in real time).
 
-const LOST_WINDOW_MS = 10 * 60_000;
+const ACTIVE_MS = 5 * 60_000;
+const MOMENT_MS = 30_000;
+const MANY_LOST = 0.25; // a quarter of the class lost: suggest stopping to go over it
 let lostFlags = [];
+let addressed = new Map(); // topic key ("*" = everything) → lecture time it was addressed
 let captionText = new Map();
+let joined = 0;
 let clock = { lecture: 0, at: Date.now() };
 
 function tickClock(event) {
@@ -561,87 +576,99 @@ function tickClock(event) {
 }
 const lectureNow = () => clock.lecture + (Date.now() - clock.at);
 const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+const addressedKey = (e) => e.topicId ?? (e.moment !== undefined ? `moment-${e.moment}` : "*");
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** Presses that still count: recent, and not addressed since. Grouped by topic (or 30 s moment). */
+function activeGroups() {
+  const now = lectureNow();
+  const groups = new Map();
+  lostFlags.forEach((f, i) => {
+    const group = f.topicId && topicLabels.has(f.topicId) ? f.topicId : `moment-${Math.floor(f.t / MOMENT_MS)}`;
+    const since = Math.max(addressed.get(group) ?? -1, addressed.get("*") ?? -1);
+    if (now - f.at >= ACTIVE_MS || f.at <= since) return;
+    const g = groups.get(group) ?? { key: group, students: new Set(), words: new Map(), t: f.t, captionId: f.captionId, last: 0 };
+    g.students.add(f.student ?? `press-${i}`); // older events have no token: count each press
+    for (const h of f.highlights ?? []) {
+      const w = h.text.toLowerCase().replace(/\s+/g, " ").trim();
+      const entry = g.words.get(w) ?? { text: h.text, students: new Set() };
+      entry.students.add(f.student ?? `press-${i}`);
+      g.words.set(w, entry);
+    }
+    if (f.t < g.t) Object.assign(g, { t: f.t, captionId: f.captionId });
+    g.last = Math.max(g.last, f.at);
+    groups.set(group, g);
+  });
+  return [...groups.values()].sort((a, b) => b.students.size - a.students.size || b.last - a.last);
+}
 
 function renderLost() {
-  const recent = lostFlags.filter((f) => lectureNow() - f.at < LOST_WINDOW_MS);
-  $("lostTotal").textContent = recent.length;
-  $("lostTotalLabel").textContent = recent.length === 1 ? 'student has pressed "I\'m lost"' : 'students have pressed "I\'m lost"';
-  $("lostEmpty").hidden = recent.length > 0;
+  const groups = activeGroups();
+  const lost = new Set(groups.flatMap((g) => [...g.students])).size;
+  // Phones that pressed and then left still count, so only compare with the class when it makes sense.
+  const known = joined >= lost && joined > 0;
+  const share = known ? lost / joined : 0;
+  const level = lost === 0 ? "none" : share >= MANY_LOST || (!known && lost >= 3) ? "many" : "some";
+  const card = $("lostCard");
+  card.dataset.level = level;
 
-  // By topic (flags with no topic are grouped as "Not on the mind map yet").
-  const byTopic = new Map();
-  for (const f of recent) {
-    const key = f.topicId && topicLabels.has(f.topicId) ? f.topicId : "";
-    byTopic.set(key, (byTopic.get(key) ?? 0) + 1);
-  }
-  const rows = [...byTopic].sort((a, b) => b[1] - a[1]);
-  const max = Math.max(1, ...rows.map(([, n]) => n));
+  $("lostTotal").textContent = lost;
+  $("lostTotalLabel").textContent = lost === 0
+    ? "No one is lost right now"
+    : `${lost === 1 ? "student is" : "students are"} lost${known ? ` · of ${joined} joined (${Math.round(share * 100)}%)` : ""}`;
+  $("lostMeter").style.width = `${Math.round((known ? share : lost ? 1 : 0) * 100)}%`;
+  $("lostAdvice").textContent =
+    level === "many" ? "Many students are lost. Consider pausing to go over it."
+    : level === "some" ? "Press Addressed once you've gone over a topic. Students see that you did."
+    : "Students press \"I'm lost\" on their phones. It's anonymous.";
+  $("lostClear").hidden = lost === 0;
+
+  // Always visible in the top bar, and in the tab title for teachers presenting another window.
+  $("lostPillCount").textContent = lost;
+  $("lostPill").classList.toggle("on", lost > 0);
+  document.title = lost ? `(${lost} lost) SYNC. · Teacher` : "SYNC. · Teacher";
+
   $("lostTopics").replaceChildren(
-    ...rows.map(([id, n]) => {
-      const row = document.createElement("div");
-      row.className = `lost-row${id && id === focusId ? " now" : ""}`;
-      const label = document.createElement("strong");
-      label.textContent = id ? topicLabels.get(id) : "Not on the mind map yet";
-      const count = document.createElement("span");
-      count.className = "count";
-      count.textContent = `${n} lost`;
-      const bar = document.createElement("div");
-      bar.className = "bar";
-      bar.innerHTML = `<span style="width:${Math.round((n / max) * 100)}%"></span>`;
-      row.append(label, count, bar);
+    ...groups.map((g) => {
+      const row = document.createElement("li");
+      row.className = "lost-row";
+      const topic = document.createElement("div");
+      topic.className = "topic";
+      topic.textContent = topicLabels.get(g.key) ?? `Around ${mmss(g.t)}`;
+      if (g.key === focusId) topic.insertAdjacentHTML("beforeend", '<span class="tag">Now</span>');
+      const n = document.createElement("div");
+      n.className = "n";
+      n.innerHTML = `${g.students.size}<small>${g.students.size === 1 ? "student" : "students"}</small>`;
+      const detail = document.createElement("div");
+      detail.className = "detail";
+      const words = [...g.words.values()].sort((a, b) => b.students.size - a.students.size).slice(0, 3);
+      for (const w of words) {
+        const chip = document.createElement("span");
+        chip.className = "word";
+        chip.textContent = `“${w.text}”${w.students.size > 1 ? ` ×${w.students.size}` : ""}`;
+        detail.append(chip);
+      }
+      const said = captionText.get(g.captionId);
+      if (!words.length && said) detail.textContent = `While you said “${said.length > 80 ? `${said.slice(0, 80)}…` : said}”`;
+      const done = document.createElement("button");
+      done.className = "btn done";
+      done.textContent = "Addressed";
+      done.onclick = () => markAddressed(g.key);
+      row.append(topic, n, detail, done);
       return row;
     }),
   );
-
-  // The exact words students highlighted, most-highlighted first.
-  const words = new Map();
-  for (const f of recent) {
-    for (const h of f.highlights ?? []) {
-      const key = h.text.toLowerCase().replace(/\s+/g, " ").trim();
-      const w = words.get(key) ?? { text: h.text, source: h.source, n: 0 };
-      w.n++;
-      words.set(key, w);
-    }
-  }
-  const topWords = [...words.values()].sort((a, b) => b.n - a.n).slice(0, 5);
-  $("lostWordsWrap").hidden = topWords.length === 0;
-  $("lostWords").replaceChildren(
-    ...topWords.map((w) => {
-      const li = document.createElement("li");
-      const quote = document.createElement("strong");
-      quote.textContent = `“${w.text}”`;
-      const where = document.createElement("span");
-      where.className = "where";
-      where.textContent = w.source === "board" ? " on the board" : " in what you said";
-      li.append(quote, ` · ${w.n} student${w.n === 1 ? "" : "s"}`, where);
-      return li;
-    }),
-  );
-
-  // Top moments: 30-second slices of the lecture with the most presses, and what was being said.
-  const byMoment = new Map();
-  for (const f of recent) {
-    const slice = Math.floor(f.t / 30_000);
-    const m = byMoment.get(slice) ?? { t: f.t, n: 0, captionId: f.captionId };
-    m.n++;
-    if (f.t < m.t) Object.assign(m, { t: f.t, captionId: f.captionId });
-    byMoment.set(slice, m);
-  }
-  const moments = [...byMoment.values()].sort((a, b) => b.n - a.n).slice(0, 3);
-  $("lostMomentsWrap").hidden = moments.length === 0;
-  $("lostMoments").replaceChildren(
-    ...moments.map((m) => {
-      const li = document.createElement("li");
-      const when = document.createElement("span");
-      when.className = "when";
-      when.textContent = mmss(m.t);
-      const said = captionText.get(m.captionId);
-      li.append(when, ` · ${m.n} lost${said ? ` · “${said.length > 70 ? `${said.slice(0, 70)}…` : said}”` : ""}`);
-      return li;
-    }),
-  );
 }
-setInterval(renderLost, 15_000); // let old presses age out of the 10-minute window
+setInterval(renderLost, 15_000); // let old presses age out of the 5-minute window
+
+async function markAddressed(group) {
+  const body = group === "*" ? {} : group.startsWith("moment-") ? { moment: Number(group.slice(7)) } : { topicId: group };
+  const res = await post("/api/lost/addressed", body).catch(() => ({ error: "server unreachable" }));
+  if (res.error) return toast(`Couldn't update: ${res.error}`);
+  toast(group === "*" ? "Cleared. Students see you've gone over it." : "Marked addressed. Students see you've gone over it.");
+}
+$("lostClear").onclick = () => markAddressed("*");
+$("lostPill").onclick = () => $("lostCard").scrollIntoView({ behavior: "smooth", block: "center" });
 
 // ---------- Keyboard and presentation clicker ----------
 // Clickers send Page Down / arrow keys (and "b"), so the teacher can capture from across the room.

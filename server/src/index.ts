@@ -202,6 +202,16 @@ app.post("/api/lost", express.json(), async (req, res) => {
   res.json({ ...result, catchUp });
 });
 
+// The teacher has gone over a topic (or a moment, or everything): presses before now stop counting
+// as "lost right now", and students' apps can tell them the teacher saw it.
+app.post("/api/lost/addressed", requireTeacher, express.json(), (req, res) => {
+  const topicId = typeof req.body?.topicId === "string" ? req.body.topicId.slice(0, 32) : undefined;
+  const moment = Number.isInteger(req.body?.moment) && req.body.moment >= 0 ? req.body.moment : undefined;
+  log.push({ type: "addressed", t: log.now(), ...(topicId && { topicId }), ...(moment !== undefined && !topicId && { moment }) });
+  console.log(`[lost] teacher addressed ${topicId ?? (moment !== undefined ? `moment ${moment}` : "everything")}`);
+  res.json({ ok: true });
+});
+
 // Notes for a mind map topic, written the first time anyone opens it and shared after that.
 // Open to any site so Lovable's preview can fetch them too.
 app.get("/api/topics/:id/notes", async (req, res) => {

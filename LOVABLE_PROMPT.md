@@ -394,3 +394,39 @@ Use these only if the first prompt above was already pasted before they were add
 >   lines of this lecture". All text is plain (maths as x², √, ±) except `formulas[].latex`.
 > - Escape or clicking outside closes it and returns focus to the box. Respect the reader's font
 >   and size settings.
+
+## 9. The teacher answers "I'm lost" (added 2026-11-07)
+
+> Two additions to the event stream. Please handle both; everything else stays the same.
+>
+> **1. `student` on `lost` events.** `lost` events now carry `student?: string`, an anonymous token
+> that is the same for one phone within one lecture. Add it to `LostEvent`. In the Class pulse view
+> (and anywhere else that counts "students"), count **unique** `student` values instead of events;
+> an event without `student` counts as one student on its own. This fixes "3 students" when one
+> student pressed three times.
+>
+> **2. New `addressed` event.**
+> ```ts
+> | { type: "addressed"; t: number; topicId?: string; moment?: number }
+> ```
+> The teacher pressed "Addressed": they've gone over that topic (`topicId`), or a 30-second moment
+> with no topic (`moment` = Math.floor(t / 30000) of the presses it covers), or everything (neither).
+> - Keep it in state (`addressed: AddressedEvent[]`) and add a reducer case.
+> - If **this student** pressed "I'm lost" on that topic (or any topic, for "everything") before the
+>   event's `t`, show a calm, dismissible notice at the bottom of the feed: "✓ Your teacher went over
+>   {topic label}. Still lost? Press I'm lost again." (topic label from the latest mind map, else "it").
+>   Announce it politely to screen readers (`aria-live="polite"`). Don't show it to students who
+>   didn't press.
+> - In the Class pulse view, presses before a matching `addressed` event no longer count as "lost
+>   right now"; show them greyed out under "Gone over".
+> - "Lost right now" everywhere means: pressed in the last 5 minutes and not addressed since (the
+>   server's reply to `POST /api/lost` already counts `students` this way).
+>
+> **Mock mode:** add this line near the end of `src/lib/demo/demoLecture.json` (after the
+> last `lost` event), so the demo shows the teacher answering:
+> ```json
+> {"type":"addressed","t":80000,"topicId":"t9"}
+> ```
+> and give the demo's `lost` events a `student` value (any short string; reuse one so the pulse view
+> shows fewer students than presses).
+
