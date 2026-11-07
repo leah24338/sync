@@ -522,7 +522,8 @@ function watchFeed() {
       // Events in the first moment after connecting are the catch-up history, not new presses.
       if (Date.now() - openedAt > 1500) {
         const where = topicLabels.get(event.topicId);
-        toast(where ? `A student is lost on “${where}”` : "A student pressed “I'm lost”");
+        const words = event.highlights?.[0]?.text;
+        toast(words ? `A student is lost on “${words}”` : where ? `A student is lost on “${where}”` : "A student pressed “I'm lost”");
         $("lostCard").classList.add("alert");
         setTimeout(() => $("lostCard").classList.remove("alert"), 4000);
       }
@@ -589,6 +590,31 @@ function renderLost() {
       bar.innerHTML = `<span style="width:${Math.round((n / max) * 100)}%"></span>`;
       row.append(label, count, bar);
       return row;
+    }),
+  );
+
+  // The exact words students highlighted, most-highlighted first.
+  const words = new Map();
+  for (const f of recent) {
+    for (const h of f.highlights ?? []) {
+      const key = h.text.toLowerCase().replace(/\s+/g, " ").trim();
+      const w = words.get(key) ?? { text: h.text, source: h.source, n: 0 };
+      w.n++;
+      words.set(key, w);
+    }
+  }
+  const topWords = [...words.values()].sort((a, b) => b.n - a.n).slice(0, 5);
+  $("lostWordsWrap").hidden = topWords.length === 0;
+  $("lostWords").replaceChildren(
+    ...topWords.map((w) => {
+      const li = document.createElement("li");
+      const quote = document.createElement("strong");
+      quote.textContent = `“${w.text}”`;
+      const where = document.createElement("span");
+      where.className = "where";
+      where.textContent = w.source === "board" ? " on the board" : " in what you said";
+      li.append(quote, ` · ${w.n} student${w.n === 1 ? "" : "s"}`, where);
+      return li;
     }),
   );
 

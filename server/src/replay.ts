@@ -42,6 +42,12 @@ function retime(event: LectureEvent, prefix: string, shift: (t: number) => numbe
     case "focus":
       return { ...event, t: shift(event.t) };
     case "lost":
-      return { ...event, t: shift(event.t), at: shift(event.at), captionId: event.captionId && prefix + event.captionId };
+      return {
+        ...event,
+        t: shift(event.t),
+        at: shift(event.at),
+        captionId: event.captionId && prefix + event.captionId,
+        highlights: event.highlights?.map((h) => (h.source === "feed" ? { ...h, sourceId: prefix + h.sourceId } : h)),
+      };
   }
 }

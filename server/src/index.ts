@@ -9,6 +9,7 @@ import { claudeEnabled } from "./claude.js";
 import { config } from "./config.js";
 import { EventLog, type CaptionEvent } from "./events.js";
 import { MindMapper } from "./mindmap.js";
+import { CatchUpWriter } from "./catchup.js";
 import { LostTracker } from "./lost.js";
 import { replayFile } from "./replay.js";
 import { settings, updateSettings } from "./settings.js";
@@ -37,6 +38,7 @@ function createPipelines() {
 let pipelines = createPipelines();
 let stopReplay: (() => void) | null = null;
 let lost = new LostTracker(log);
+let catchUps = new CatchUpWriter(log);
 log.subscribe((event) => lost.observe(event));
 
 // ---------- WebSockets: /ws for students (receive only), /ws/teacher for microphone audio ----------
@@ -147,6 +149,7 @@ function resetLecture(): void {
   snapshots.clear();
   pipelines = createPipelines();
   lost = new LostTracker(log);
+  catchUps = new CatchUpWriter(log);
   // Phones reconnect automatically and download the (now empty) log.
   for (const ws of studentWss.clients) ws.close(1012, "lecture reset");
 }
@@ -181,10 +184,13 @@ app.use("/api/lost", (req, res, next) => {
   if (req.method === "OPTIONS") return void res.sendStatus(204);
   next();
 });
-app.post("/api/lost", express.json(), (req, res) => {
+app.post("/api/lost", express.json(), async (req, res) => {
+  // The flag reaches the teacher immediately; the student's reply then waits (~2-4 s) for a
+  // catch-up, which is shared by everyone lost at the same moment on the same topic.
   const result = lost.flag(req.body);
   if (!result.ok) return void res.status(result.status).json({ error: result.error });
-  res.json(result);
+  const catchUp = await catchUps.get(result.t, result.topicId, result.highlights);
+  res.json({ ...result, catchUp });
 });
 
 app.get("/api/settings", (_req, res) => res.json(settings));
