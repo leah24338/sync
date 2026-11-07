@@ -289,3 +289,67 @@ Use these only if the first prompt above was already pasted before they were add
 > {"type":"lost","t":36000,"at":39000,"topicId":"t4","captionId":"c6"}
 > {"type":"lost","t":40500,"at":42000,"topicId":"t4","captionId":"c7"}
 > ```
+
+## 6. "I'm lost" catch-up for the student (added 2026-11-07)
+
+> The response from `POST /api/lost` (prompt 5) now also includes a personal catch-up:
+>
+> ```ts
+> {
+>   ok: true, duplicate: boolean, t: number, topicId?: string, students: number,
+>   catchUp: null | {
+>     summary: string[];                                  // exactly 2 short lines
+>     assumed: { term: string; explanation: string }[];   // 0–3 things the teacher assumed you knew
+>   }
+> }
+> ```
+>
+> It takes about 2–5 seconds (the teacher's count updates instantly; the catch-up is written by AI).
+> All text is plain (maths like x² + 6x + 5 = 0), so render it as text.
+>
+> After the student confirms in the "Which part lost you?" sheet, turn the sheet into a
+> **catch-up card** instead of closing it:
+> - While waiting: a calm skeleton with "Catching you up…" (no spinner flashing; respect
+>   reduced motion).
+> - Heading "Here's what you missed", then the 2 `summary` lines as short paragraphs in
+>   comfortable reading size (follow the reader's font, size and spacing settings).
+> - If `assumed` isn't empty: a section "You were assumed to know" listing each `term` in bold
+>   with its `explanation`; collapsed behind a "Show" toggle when there are more than 2.
+> - A small line underneath: "{students} student(s) lost here too. Your teacher can see it."
+>   (anonymous).
+> - Buttons: "Got it" (closes and jumps the feed back to live) and "Read it to me" (speaks the
+>   summary and explanations with the browser's speech synthesis).
+> - If `catchUp` is null (nothing to summarise yet, or the AI was unavailable), show just the
+>   confirmation from prompt 5.
+> - Put the card's text in an `aria-live="polite"` region so screen readers read it when it arrives.
+>
+> For mock mode, when the student presses "I'm lost", wait 1.5 s and show this sample:
+>
+> ```json
+> {"ok":true,"duplicate":false,"t":45034,"topicId":"t4","students":2,"catchUp":{"summary":["Quadratics have x² as the highest power; rearrange to ax² + bx + c = 0, then plug a, b, c into the quadratic formula.","The part under the square root, b² − 4ac, is the discriminant; now we've hit an example where it's negative."],"assumed":[{"term":"Square root of a negative number","explanation":"No real number squared gives a negative, so √ of a negative has no real answer, meaning the equation has no real solutions."},{"term":"± symbol","explanation":"Plus-or-minus means you work out the formula twice, once adding and once subtracting, usually giving two answers."},{"term":"Coefficients a, b, c","explanation":"These are the numbers in front of x², in front of x, and the constant on its own, read from standard form."}]}}
+> ```
+
+## 7. Send the highlighted words to the teacher (added 2026-11-07)
+
+> The lecture server now accepts the exact words a student highlights, so the teacher can see
+> them. Change `sendLost` in `src/lib/lost.ts`:
+>
+> - Send **one request per "I'm lost" press** (not one per timestamp) with all the highlighted
+>   pieces:
+>   ```ts
+>   POST {serverBase}/api/lost
+>   { clientId, t?, highlights: { source: "feed" | "board"; sourceId: string; text: string }[] }
+>   ```
+>   `source`/`sourceId` are the `TextPiece` fields (caption id for "feed", board block id for
+>   "board"); `text` is the highlighted words exactly as shown (for board lines, from `plain`).
+>   Send up to 5 pieces. `t` is optional: without it the server uses the earliest highlighted line.
+> - The server only keeps words that really appear in that caption or board line, and replies
+>   `{ ok, duplicate, t, topicId?, highlights, students, catchUp }`; `highlights` is what it kept.
+> - Replace the note "Your teacher receives the lecture moments, not the highlighted words" with
+>   "Your teacher sees the words you highlight. It's anonymous."
+> - `lost` events now may include `highlights` (same shape). In the Pulse tab, under each moment,
+>   list the highlighted words with how many students marked them (most first), instead of only the
+>   whole caption.
+> - Update `src/test/lost.test.ts`: the request body now has `clientId`, `highlights` (and `t` when
+>   sent).
+> - The catch-up card (prompt 6) now focuses on the highlighted words; no change needed there.

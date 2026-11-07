@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Test viewer</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <!-- Mind map rendering (the same library the Lovable app uses) -->
@@ -11,9 +12,11 @@
   <script defer src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.12/dist/browser/index.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"></script>
   <style>
-    :root { --bg: #fff; --ink: #1c1c1a; --muted: #8a8a84; --line: #e2e2dc; --idiom: #8a4b00; --term: #2457d6; --accent: #2457d6; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --ink: #ededea; --muted: #8f8f88; --line: #34342f; --idiom: #ffb35c; --term: #7aa2ff; --accent: #7aa2ff; } }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+    :root { --bg: oklch(0.992 0.008 85); --ink: oklch(0.27 0.06 30); --muted: oklch(0.47 0.04 35); --line: oklch(0.32 0.08 28 / 0.14);
+      --idiom: oklch(0.5 0.1 10); --term: oklch(0.45 0.1 265); --accent: oklch(0.32 0.08 28); }
+    @media (prefers-color-scheme: dark) { :root { --bg: oklch(0.225 0.014 250); --ink: oklch(0.93 0.008 85); --muted: oklch(0.74 0.015 250);
+      --line: oklch(0.36 0.014 250); --idiom: oklch(0.8 0.12 65); --term: oklch(0.8 0.1 260); --accent: oklch(0.78 0.1 200); } }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Atkinson Hyperlegible", system-ui, sans-serif; }
     header { position: sticky; top: 0; z-index: 1; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
     header select, header button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; min-height: 32px; }
     header button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }

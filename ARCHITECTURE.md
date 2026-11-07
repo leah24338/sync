@@ -55,7 +55,7 @@ There are four kinds of event (the same contract the Lovable app uses):
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
 | `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
 | `board` | The whole cleaned-up whiteboard at that moment, plus a link to the photo. Each line: `content` (LaTeX for equations; words with any maths in `$…$` for text), `plain` (readable Unicode) and `spoken` (words for screen readers). |
-| `lost` | A student pressed "I'm lost" (anonymous): `t` (the moment they were lost at), `at` (when they pressed), `topicId`, `captionId` (what was being said). |
+| `lost` | A student pressed "I'm lost" (anonymous): `t` (the moment they were lost at), `at` (when they pressed), `topicId`, `captionId` (what was being said), `highlights` (exact words they marked, verified). |
 | `focus` | Which mind map topic the teacher is talking about right now (`topicId`). Only sent when it changes; the log keeps just the latest one. |
 | `mindmap` | The whole mind map: `title` (the main subject), `topics` (each with a `relatedness` score 0–1, `details` and `links` to other topics), and the same map as a Markdown outline (`markdown`) for simple tree views. |
 
@@ -117,17 +117,27 @@ old clay tablets" moved it to Babylonian history without a mind map update. Cost
 The one place students send something to the server:
 
 1. A student presses "I'm lost" and picks the moment (and optionally the topic) in the app.
-2. The app sends `POST /api/lost` `{ clientId, t, topicId? }`. `clientId` is a random id kept on
-   the phone, used only so one student can't count twice. Nothing identifying is stored or shown.
+2. The app sends `POST /api/lost` `{ clientId, t?, topicId?, highlights? }`. `clientId` is a random
+   id kept on the phone, used only so one student can't count twice. Nothing identifying is stored or
+   shown. `highlights` are the exact words the student marked in a caption or board line; the server
+   keeps only words that really appear in the line they name (up to 5), so nobody can post free text
+   onto the teacher's screen.
 3. The server fills in the topic the teacher was on at moment `t` (from the focus history) when the
    student didn't pick one, and what was being said then. It ignores the same phone flagging the same
-   topic again within 2 minutes, allows one press per phone every 5 s, and broadcasts a `lost` event
-   to every screen.
+   thing again within 2 minutes, allows up to 3 presses per phone in any 10 s, and broadcasts a `lost`
+   event (with the highlights) to every screen.
 4. It replies with how many students are lost on that topic (last 10 min), so the student sees
-   "you're not alone".
+   "you're not alone", plus a **personal catch-up** (`catchup.ts`): a 2-line summary of the last
+   3 minutes before that moment and up to 3 things the teacher assumed students knew, each explained
+   in one sentence. Claude writes it from the transcript, the board and the mind map topic. The flag
+   reaches the teacher before the AI runs; the student's reply waits ~2–5 s. **Shared**: students
+   lost within the same 30 seconds on the same topic get the same catch-up, so a whole class lost at
+   one point costs one call (about a cent). Tested: first student 4.5 s, the second at the same moment
+   7 ms with the identical catch-up.
 5. The teacher console's **Students lost** panel shows the total for the last 10 minutes, a bar per
-   topic (the current topic is marked "now"), the most confusing moments with the caption at that
-   time, and an alert toast as each press arrives.
+   topic (the current topic is marked "now"), the **words students highlighted** with counts, the most
+   confusing moments with the caption at that time, and an alert toast as each press arrives.
+6. The catch-up focuses on the highlighted words when there are any.
 
 `/api/lost` allows cross-site requests, so Lovable's own preview (on its own domain) can send flags
 too. Tested: automatic topic (a press "now" → Quadratic formula, a press pointing at 0:16 →
@@ -283,6 +293,13 @@ Built so a teacher needs one button:
 
 The audio protocol and capture logic are unchanged from the earlier console.
 
+**Look:** the console shares the student app's "SYNC." identity (`web/src/styles.css`): the
+italic SYNC. wordmark, Playfair Display headings, Atkinson Hyperlegible text, and the same oklch
+palette (cream paper and burgundy ink in light mode, slate and cyan in dark mode). It's tuned to
+feel more like a professional tool: thin lines instead of heavy borders, small uppercase section
+labels, a thin brand bar, consistent spacing, and quiet shadows. The embedded preview uses the same
+palette and font.
+
 ### Teacher WebSocket: `/ws/teacher`
 Page → server: `{"type":"start"}` before each recording, then binary WebM/Opus chunks.
 Server → page: `{"type":"status","state":"connecting|open|closed|error","message"?}` and
@@ -296,7 +313,7 @@ Server → page: `{"type":"status","state":"connecting|open|closed|error","messa
 | `GET /api/status` | Viewer count, event count, whether Claude/Deepgram keys are set |
 | `GET /api/settings` · `POST /api/settings` | Explanation settings: `{"idioms":"off|tricky|standard|all","terms":"…"}` (either field optional) |
 | `POST /api/board` | Body: a JPEG. Queues a board read (202) |
-| `POST /api/lost` | `{ clientId, t?, topicId? }` from a student's phone. Returns `{ ok, duplicate, topicId?, students }`; 429 if pressed again within 5 s. Open to any site |
+| `POST /api/lost` | `{ clientId, t?, topicId?, highlights? }` from a student's phone (`highlights`: `[{ source: "feed"|"board", sourceId, text }]`). Returns `{ ok, duplicate, t, topicId?, highlights, students, catchUp }` (`catchUp`: `{ summary: [2 lines], assumed: [{ term, explanation }] }` or null); 429 after 3 presses in 10 s. Open to any site |
 | `GET /api/snapshots/:id` | A stored board photo |
 | `POST /api/replay` | `{}` for the demo lecture, or `{"session":"<file>","speed":2}` |
 | `POST /api/replay/stop` · `POST /api/save` · `GET /api/sessions` · `POST /api/reset` | Lecture controls |
@@ -312,6 +329,7 @@ server/
   src/annotate.ts   Idioms, sarcasm, key terms (with a 1–3 confusion level)
   src/settings.ts   Teacher's explanation settings (off / tricky / standard / all)
   src/lost.ts       Anonymous "I'm lost" flags: topic lookup, limits, counts
+  src/catchup.ts    "I'm lost" catch-ups (2-line summary + assumed knowledge), shared per moment
   src/board.ts      Whiteboard photo → text + LaTeX
   src/mathText.ts   Validates LaTeX, converts to readable Unicode and spoken words
   src/mindmap.ts    Incremental mind map outline
@@ -435,6 +453,18 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** Teacher console restyled to match the student app's SYNC. design (wordmark,
+  Playfair Display + Atkinson Hyperlegible, shared oklch palette in light and dark), in a more
+  restrained, professional form; preview restyled to match. Layout and behaviour unchanged.
+
+- **2026-11-07:** "I'm lost" accepts the exact highlighted words (verified against the caption or
+  board line, max 5), shows them to the teacher ("Words students highlighted") and focuses the
+  catch-up on them. Fixed: the app's one-request-per-moment flags hit the 5 s limit; now up to 3
+  presses per 10 s. Lovable prompt 7.
+
+- **2026-11-07:** "I'm lost" now returns a personal catch-up (2-line summary of the last 3 minutes
+  + up to 3 assumed-knowledge explanations), shared per 30-second moment and topic. Lovable prompt 6.
 
 - **2026-11-07:** "I'm lost" goes to the teacher: `POST /api/lost` (anonymous, rate-limited,
   cross-site), `lost` events with the topic filled in from the focus history, a Students lost panel
