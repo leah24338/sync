@@ -382,7 +382,7 @@ npm run dev                     # from server/: restarts on file changes
 
 ### The student app (Lovable)
 
-Repo: `chengrace086-ux/lecture-lens` (Person 2), cloned into `wie_hack/web` (ignored by our repo).
+Repo: `leah24338/project-migration-hub` (Lovable, Person 2; moved there from `chengrace086-ux/lecture-lens`), cloned into `wie_hack/web` (ignored by our repo).
 It's a TanStack Start app on Lovable's Vite wrapper. Its `src/lib/events.ts` already speaks our
 event format and connects to `/ws` in live mode, so the only change on our side is the proxy in
 `web/vite.config.ts` (passed through the wrapper's `vite:` option):
@@ -478,6 +478,11 @@ so a closely related phrase may get explained twice ("discriminant", then "negat
   10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
 
 ## Changelog
+
+- **2026-11-07:** The student app moved to a new Lovable project, `leah24338/project-migration-hub`;
+  `web/` now pulls from it and no longer from the old repo. Its first commit was a copy of an older
+  version of the app, so the latest code (topic notes panel, demo data, branching) was pushed on top
+  as a normal commit (`607cf79`), keeping Lovable's migration ledger and favicon.
 
 - **2026-11-07:** Cheaper AI: text tasks (notes, mind map, focus, catch-ups, topic notes) moved to
   Claude Haiku 5.5, board reading stays on Opus 5.5 (`CLAUDE_TEXT_MODEL` / `CLAUDE_MODEL`). Each

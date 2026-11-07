@@ -16,7 +16,7 @@
 | Tunnel | cloudflared quick tunnel (ngrok as backup) |
 | Primary persona | **TODO**: pick one (e.g. first-semester international student, or hard-of-hearing student) |
 | Hackathon length / deadline | **TODO**: fill in, then adjust the timeline below |
-| Repos | Server + docs: `leah24338/sync`. Student app: `chengrace086-ux/lecture-lens` (Lovable), cloned into `web/`, connected to the server through the Vite proxy and verified in live mode |
+| Repos | Server + docs: `leah24338/sync`. Student app: `leah24338/project-migration-hub` (Lovable; moved from `chengrace086-ux/lecture-lens`), cloned into `web/`, connected to the server through the Vite proxy and verified in live mode |
 
 ## The product in one sentence
 
