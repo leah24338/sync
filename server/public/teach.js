@@ -425,6 +425,10 @@ const MOTION_LIMIT = 0.01; // under 1% of pixels changing between ticks counts a
 const CHANGE_MIN = 0.008; // over 0.8% of pixels differing from the last photo counts as "new writing"
 const STILL_MS = 2000;
 const MIN_GAP_MS = 5000;
+// Screens change constantly in small ways (a clock, a cursor, live captions in another window),
+// so a screen share needs a bigger change (a new slide) and a longer gap before it's read again.
+const SCREEN_CHANGE_MIN = 0.04;
+const SCREEN_MIN_GAP_MS = 10_000;
 const TICK_MS = 500;
 
 const small = document.createElement("canvas");
@@ -466,7 +470,10 @@ setInterval(() => {
   const change = changedFraction(frame, lastSentFrame);
   const pct = (x) => `${(x * 100).toFixed(1)}%`;
   $("meter").textContent = `motion ${pct(motion)} · new since last photo ${pct(change)} · still ${(stillMs / 1000).toFixed(1)} s`;
-  if (stillMs >= STILL_MS && change > CHANGE_MIN && Date.now() - lastSentAt > MIN_GAP_MS) {
+  const screen = boardKind === "screen";
+  const changeMin = screen ? SCREEN_CHANGE_MIN : CHANGE_MIN;
+  const minGap = screen ? SCREEN_MIN_GAP_MS : MIN_GAP_MS;
+  if (stillMs >= STILL_MS && change > changeMin && Date.now() - lastSentAt > minGap) {
     captureBoard(true);
   }
 }, TICK_MS);
