@@ -71,7 +71,11 @@ export class BoardReader {
         { type: "text", text: "NEW PHOTO is above. Return the updated board." },
       ],
     });
-    if (!result || !result.changed) return;
+    if (!result) return;
+    if (!result.changed) {
+      console.log("[board] nothing new in that image, no update sent");
+      return;
+    }
 
     const seen = new Set<string>();
     const blocks = result.blocks
@@ -81,7 +85,10 @@ export class BoardReader {
         seen.add(id);
         return { ...b, id };
       });
-    if (JSON.stringify(blocks) === JSON.stringify(this.blocks)) return;
+    if (JSON.stringify(blocks) === JSON.stringify(this.blocks)) {
+      console.log("[board] same content as before, no update sent");
+      return;
+    }
 
     const oldContent = new Set(this.blocks.map((b) => b.content));
     const added = blocks.filter((b) => !oldContent.has(b.content)).map((b) => b.content);
@@ -90,6 +97,7 @@ export class BoardReader {
     const id = this.log.nextId("board-");
     this.snapshots.set(id, jpeg);
     this.log.push({ type: "board", id, t: this.log.now(), snapshotUrl: `/api/snapshots/${id}`, blocks });
+    console.log(`[board] update sent: ${blocks.length} blocks, ${added.length} new`);
     if (added.length) this.mindMapper.addBoard(added.join("; "));
   }
 }

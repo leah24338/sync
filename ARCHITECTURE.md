@@ -381,7 +381,24 @@ The app doesn't use the annotation `level` yet (follow-up prompt in `LOVABLE_PRO
 **Known quirk:** two sentences annotated at the same moment can't see each other's explanations,
 so a closely related phrase may get explained twice ("discriminant", then "negative discriminant").
 
+### When the board and mind map update (expected behaviour, not a bug)
+
+- **Board:** only after a capture (button, Space/clicker, or auto-capture), and only when Claude
+  finds new lesson content. Re-capturing the same board, or a screen showing our own apps, sends
+  nothing. The server log says which: `[board] update sent`, `[board] nothing new in that image`.
+- **Mind map:** at most every ~45 s, after ~15 new words of speech or board text, and only when
+  there's real lesson content (filler and chatter are ignored). Log: `[mindmap] update sent` /
+  `[mindmap] nothing new worth adding`.
+- **Screen share auto-capture** needs a bigger change (4% of the image, roughly a new slide) and a
+  10 s gap, because screens change constantly in small ways. Camera auto-capture keeps 0.8% / 5 s.
+
 ## Changelog
+
+- **2026-11-07:** Investigated "board photos and mind map don't update": a test session had only
+  chatter (nothing for the mind map) and a shared screen showing our own apps (no new board content),
+  while screen auto-capture fired ~25 times in 5 minutes. Added logs for skipped updates and stricter
+  screen auto-capture (4% change, 10 s gap). Verified through the app's proxy: new slide → board
+  update in 3 s, repeat → skipped, new board → update, mind map grew from board text alone.
 
 - **2026-11-07:** Screen share as a board source (Camera / Screen share switch). Verified: the
   switch updates the console; a slide screenshot with an app toolbar was read as a title plus

@@ -90,6 +90,9 @@ export class MindMapper {
       if (JSON.stringify(merged) !== JSON.stringify(this.map)) {
         this.map = merged;
         this.log.push({ type: "mindmap", t: this.log.now(), markdown: toMarkdown(merged), ...merged });
+        console.log(`[mindmap] update sent: ${merged.topics.length} topics`);
+      } else {
+        console.log("[mindmap] nothing new worth adding (filler, or already covered)");
       }
     } finally {
       this.busy = false;
