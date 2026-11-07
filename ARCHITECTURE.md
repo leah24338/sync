@@ -53,7 +53,7 @@ There are four kinds of event (the same contract the Lovable app uses):
 | Event | Meaning |
 |---|---|
 | `caption` | A sentence the teacher said. Re-sent with more words while they talk (`final: false`), then once more with `final: true`. |
-| `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`). |
+| `annotation` | An explanation attached to a caption: an idiom/sarcasm (`idiom`) or a technical word (`term`), with a `level` from 1 (most students know it) to 3 (likely to confuse). |
 | `board` | The whole cleaned-up whiteboard at that moment: text blocks and LaTeX equations, plus a link to the photo. |
 | `mindmap` | The whole mind map as a Markdown outline. |
 
@@ -69,7 +69,8 @@ event (catch-up), then each new one as it happens. The phone never asks for anyt
 4. When the sentence ends (a pause, a full stop, or 220 characters), the caption is marked final.
 5. Only final captions go to the AI: the **Annotator** looks for idioms, sarcasm and key terms, and
    the **MindMapper** queues the sentence for its next update.
-6. About 1–2 s later, any explanation arrives as an `annotation` event pointing at that caption.
+6. A few seconds later (typically 2–3 s, measured), any explanation arrives as an `annotation`
+   event pointing at that caption.
 
 ### 3. What happens when the teacher writes on the board
 
@@ -88,7 +89,20 @@ Claude the current outline plus only the new text. Claude returns the outline wi
 added. It is told never to remove or reword existing nodes, so the map grows without jumping
 around. The phone draws the outline as a mind map (Markmap, in the Lovable app).
 
-### 5. Replay
+### 5. Explanation settings: two layers (`settings.ts`)
+
+| Layer | Who sets it | What it does | Cost effect |
+|---|---|---|---|
+| **Teacher** (teacher console, "Explanations") | The teacher, for everyone | Tells the AI what to look for, separately for idioms/sarcasm and key terms: Off · Only tricky ones · Standard · Everything | **Both off = no AI call per sentence.** "Only tricky" makes replies shorter |
+| **Student** (each phone) | Each student, for themselves | Hides explanations below their chosen level. Every annotation carries a `level` (1–3), so this is just a filter on the phone | Free: no extra AI calls, and nobody else is affected |
+
+Levels: **3** = likely to confuse many students (uncommon idiom, sarcasm, advanced or new term),
+**2** = could confuse an English learner or literal reader (common idiom, course vocabulary),
+**1** = most students already know it. Teacher settings map to a minimum level: Only tricky = 3,
+Standard = 2 (the default), Everything = 1. The server also re-checks each note against the
+current setting, so a change applies from the very next sentence.
+
+### 6. Replay
 
 `replay.ts` plays a saved list of events (the built-in demo lecture, or a recorded session) back
 into the log with its original timing. It makes no speech or AI calls, so it's free and
@@ -103,7 +117,7 @@ Each row is something you can point to in the code and explain.
 | What | Why | Where |
 |---|---|---|
 | Streaming speech-to-text with interim results | Words appear while the teacher is still talking, not after the sentence ends | `stt.ts` (Deepgram URL params) |
-| Captions never wait for AI | The caption shows instantly; the explanation attaches 1–2 s later as a separate event | `annotate.ts` (fire-and-forget `add`) |
+| Captions never wait for AI | The caption shows instantly; the explanation attaches a few seconds later (2–3 s typical) as a separate event | `annotate.ts` (fire-and-forget `add`) |
 | Sentence-sized captions | Ends on a 300 ms pause, a full stop, or 220 characters, with Deepgram's "utterance end" as a backup in noisy rooms | `stt.ts` `CaptionAssembler` |
 | Effort tuned per task | `low` for per-sentence notes and the mind map (fast), `medium` for reading the board (accuracy matters more) | `annotate.ts`, `mindmap.ts`, `board.ts` |
 
@@ -112,10 +126,13 @@ Each row is something you can point to in the code and explain.
 | What | Why | Where |
 |---|---|---|
 | Auto-capture only sends useful photos | Compares tiny 160×90 grayscale frames twice a second. Sends only when the picture has been **still for 2 s** (teacher stepped away), **differs from the last photo** (new writing), and **5 s** have passed. A few photos a minute instead of 30 frames a second | `public/teach.js` |
-| Photos shrunk before upload | ≤1280 px JPEG at 80% quality: about 1,200 Claude tokens per photo (~$0.02 a read), fast to upload | `public/teach.js` `captureBoard` |
+| Photos shrunk before upload | ≤1280 px JPEG at 80% quality: a 16:9 photo is ~1,200 image tokens, ~1,900 with the prompt (about $0.01 a read), and uploads fast | `public/teach.js` `captureBoard` |
 | Latest photo wins | While one board read runs, newer photos replace each other in a single waiting slot. A burst of captures costs at most two calls and is never read out of order | `board.ts` `submit`/`drain` |
 | Incremental mind map | Sends the outline plus only the new text, so the prompt stays the same size however long the lecture runs; skipped entirely when under 15 new words | `mindmap.ts` |
 | Explain once | Phrases already explained are passed to Claude and filtered out, so "discriminant" isn't explained ten times | `annotate.ts` `explained` |
+| Flat prompt size | Only the 40 most recent explained phrases are sent; older repeats are caught on the server. Without this cap, every call grew a little all lecture (measured: 715 → 953 tokens over 16 sentences) | `annotate.ts` `EXPLAINED_SENT` |
+| Teacher can switch explanations off | With idioms and terms both off, the per-sentence AI call is skipped entirely (verified: zero calls); "Only tricky" cuts reply size from ~110 to ~11 tokens on sentences with nothing tricky | `annotate.ts` `add`, `settings.ts` |
+| Student filtering on the phone | Each student's "how many explanations" choice is a filter on data already sent, so personalizing costs nothing | `annotation.level`, student app |
 | Replay is free | Demo and testing don't touch the APIs | `replay.ts` |
 | Max 4 Claude calls at once | Avoids rate-limit errors during bursts of speech | `claude.ts` `withSlot` |
 
@@ -154,7 +171,39 @@ Each row is something you can point to in the code and explain.
 | Context for sarcasm | The last 3 sentences go along with each new one, since sarcasm depends on context | `annotate.ts` |
 | Board feeds the mind map | New writing on the board is added to the mind map, not just speech | `board.ts` → `mindmap.ts` |
 
-### Privacy
+## Cost model
+
+**The key point: AI cost grows with lectures, not with students.** Every Claude and Deepgram call
+happens once on the server and the result is shared with every phone, so 3 students or 300 cost
+the same.
+
+**Estimated cost of one lecture hour today** (all Claude Opus 5.5; assumes ~10 finished
+sentences a minute, ~1 board read a minute, a mind map update every 45 s; per-call costs measured):
+
+| Part | Calls per hour | Cost per hour |
+|---|---|---|
+| Idiom / term notes | ~600 | ~$3.00 |
+| Board reads | ~60 | ~$0.60 |
+| Mind map | ~80 | ~$0.30 |
+| Deepgram speech-to-text | per minute of audio | check the Deepgram console for the rate |
+| **Claude total** | | **~$4 per lecture hour** (~$0.13 per student in a class of 30) |
+
+Per-sentence notes are ~75% of the bill, so that's where the next savings are.
+
+### Further options (not built yet)
+
+| Option | Saves | Trade-off |
+|---|---|---|
+| Notes and mind map on Claude Haiku 5.5 ($0.10 / $0.50 per million tokens vs $4 / $20); keep Opus for the board | Notes drop from ~$3 to under $0.10 an hour; likely faster too | Must re-check sarcasm and idiom quality with `npm run smoke` |
+| Batch notes: one call per ~3 sentences or ~10 s | ~half the note calls' input tokens (the instructions are sent once, not three times) | Notes arrive up to ~10 s after the sentence |
+| Crop the camera to the board once at setup | Fewer image tokens, and less background for Claude to misread | One extra setup step |
+| Pause the AI when no phone is connected | Nothing spent during setup and rehearsals (meanwhile, set both explanation settings to Off) | Late joiners miss notes from that stretch |
+| Spending limit in the Anthropic console | Caps the worst case | None |
+
+**What wouldn't help:** prompt caching (our prompts are a few hundred tokens, below the minimum
+size that can be cached) and a database (it stores data; it doesn't reduce AI calls).
+
+## Privacy
 
 - Audio is never stored: it goes to Deepgram and only text comes back.
 - Board photos live in memory only and are cleared on reset.
@@ -178,6 +227,7 @@ Server → page: `{"type":"status","state":"connecting|open|closed|error","messa
 |---|---|
 | `GET /teach/` | Teacher console. `/teach/viewer.html` is a bare-bones student view for testing |
 | `GET /api/status` | Viewer count, event count, whether Claude/Deepgram keys are set |
+| `GET /api/settings` · `POST /api/settings` | Explanation settings: `{"idioms":"off|tricky|standard|all","terms":"…"}` (either field optional) |
 | `POST /api/board` | Body: a JPEG. Queues a board read (202) |
 | `GET /api/snapshots/:id` | A stored board photo |
 | `POST /api/replay` | `{}` for the demo lecture, or `{"session":"<file>","speed":2}` |
@@ -191,13 +241,15 @@ server/
   src/events.ts     Event types + the event log (compaction, catch-up)
   src/stt.ts        Deepgram stream + CaptionAssembler (words → sentences)
   src/claude.ts     Shared Claude call: structured outputs, fallback, concurrency cap, errors
-  src/annotate.ts   Idioms, sarcasm, key terms
+  src/annotate.ts   Idioms, sarcasm, key terms (with a 1–3 confusion level)
+  src/settings.ts   Teacher's explanation settings (off / tricky / standard / all)
   src/board.ts      Whiteboard photo → text + LaTeX
   src/mindmap.ts    Incremental mind map outline
   src/replay.ts     Play a saved event list with original timing
   src/config.ts     Settings and API keys from wie_hack/.env
   public/teach.*    Teacher console (mic, camera, auto-capture, controls)
-  public/viewer.html Test viewer (renders events, KaTeX for equations)
+  public/viewer.html Test viewer: Feed tab (captions, notes, board with KaTeX) and Mind map tab
+                    (drawn live with markmap), plus the per-student explanation filter
   mock/lecture.json Demo lecture (same as the Lovable mock data)
   scripts/smoke.ts  Real Claude calls to check the AI pipelines
 ```
@@ -238,16 +290,60 @@ Then tunnel the Vite port instead (`cloudflared tunnel --url http://localhost:80
 
 ## Status
 
-**Verified (2026-11-07, without API keys):** demo replay streams all four event types; a phone
+**Verified without keys (2026-11-07):** demo replay streams all four event types; a phone
 joining late gets the compacted log (18 live messages → 17 stored); save and replay of a recorded
-session; reset disconnects phones with code 1012; board upload accepted; teacher connection
-reports a missing Deepgram key; the test viewer renders captions, notes, KaTeX equations and
-mind map updates.
+session; reset disconnects phones with code 1012; the test viewer renders captions, notes,
+KaTeX equations and mind map updates.
 
-**Not verified yet:** real Deepgram captions and Claude calls (need keys), auto-capture
-thresholds on a real whiteboard, phones over the tunnel, the Lovable app in live mode.
+**Verified with real keys (2026-11-07):**
+- Live captions: generated speech streamed through `/ws/teacher` at real-time speed → words
+  appeared about 1 s behind the voice, growing in place, and each sentence finalized at its pause
+  (4 sentences: 4 final captions, 12 partial updates).
+- Notes: idioms ("a piece of cake", "tackling"), sarcasm ("Oh, great." flagged as sarcastic) and
+  key terms ("discriminant", "quadratic equations") came back correctly.
+- Board: a rendered whiteboard image was read into correct LaTeX
+  (`x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`); re-sending the same photo produced no update; a photo
+  with two new lines kept both original blocks' ids and added two new blocks.
+- Mind map: grew from speech and ignored filler.
+
+**Measured performance (Claude Opus 5.5):**
+
+| Call | Typical time | Range seen | Tokens in / out | Approx. cost |
+|---|---|---|---|---|
+| Idiom / term note (per sentence) | ~2–3 s | 1.5–6.3 s | ~800 / 10–150 | ~$0.005 |
+| Board read | ~2.5 s | 2.3–6.9 s | ~2,900 / 100–500 (square test image; a 16:9 camera photo is ~1,900 in) | ~$0.015 test, ~$0.01 real |
+| Mind map update | ~2 s | 1.8–2.2 s | ~600–750 / 50–80 | ~$0.004 |
+
+**Verified over the tunnel (2026-11-07):** a phone opened the teacher console through the
+cloudflared address and its camera captures were read by Claude (2 reads: 3.0 s, and 14.5 s for a
+dense printed page with ~1,700 output tokens, about $0.05; a whiteboard has far less text). The
+public address also served the live feed over a secure WebSocket.
+
+**Not verified yet:** a real handwritten whiteboard, auto-capture thresholds, the Lovable app in
+live mode.
+
+**Known quirk:** two sentences annotated at the same moment can't see each other's explanations,
+so a closely related phrase may get explained twice ("discriminant", then "negative discriminant").
 
 ## Changelog
+
+- **2026-11-07:** Test viewer gets a Mind map tab that draws the outline as a live tree with
+  markmap (d3 7.9.0, markmap 0.18.12 from jsDelivr; falls back to plain text if they can't load).
+  Feed shows a short "Mind map updated" line instead of the raw outline. Phone camera tested
+  through the tunnel.
+
+- **2026-11-07:** Explanation settings. Teacher console: idioms/sarcasm and key terms each set
+  to Off / Only tricky / Standard / Everything (both off skips the per-sentence AI call).
+  Annotations now carry `level` 1–3 so each student can filter on their phone; the test viewer
+  has the filter. Capped the "already explained" list at 40 so prompt size stays flat. Verified
+  with generated speech: Everything → 8 notes, tricky idioms only → 1 (the sarcasm), Off → 0
+  notes and 0 Claude calls.
+
+- **2026-11-07:** Added the cost model (cost per lecture hour, scaling with students, further
+  options). Corrected board token numbers: the test image was square, real camera photos are smaller.
+
+- **2026-11-07:** Tested with real Deepgram and Claude keys: live captions, notes, board reading
+  and the mind map all work end to end. Recorded measured latency and cost.
 
 - **2026-11-07:** Server v1: event log with caption compaction and catch-up, Deepgram streaming
   captions, Claude idiom/term notes, board reading, incremental mind map, replay and saved

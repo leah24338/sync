@@ -6,32 +6,72 @@
   <title>Test viewer</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css" />
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <!-- Mind map rendering (the same library the Lovable app uses) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.12/dist/browser/index.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/markmap-lib@0.18.12/dist/browser/index.iife.js"></script>
   <style>
-    :root { --bg: #fff; --ink: #1c1c1a; --muted: #8a8a84; --line: #e2e2dc; --idiom: #8a4b00; --term: #2457d6; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --ink: #ededea; --muted: #8f8f88; --line: #34342f; --idiom: #ffb35c; --term: #7aa2ff; } }
+    :root { --bg: #fff; --ink: #1c1c1a; --muted: #8a8a84; --line: #e2e2dc; --idiom: #8a4b00; --term: #2457d6; --accent: #2457d6; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --ink: #ededea; --muted: #8f8f88; --line: #34342f; --idiom: #ffb35c; --term: #7aa2ff; --accent: #7aa2ff; } }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
-    header { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 16px; font-size: 13px; color: var(--muted); }
+    header { position: sticky; top: 0; z-index: 1; background: var(--bg); border-bottom: 1px solid var(--line); padding: 8px 16px; font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    header select, header button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; min-height: 32px; }
+    header button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .tabs { display: flex; gap: 6px; }
     #feed { padding: 8px 16px 40px; display: grid; gap: 10px; }
     .caption.partial { color: var(--muted); font-style: italic; }
     .note { font-size: 14px; margin: 2px 0 0 12px; }
     .note.idiom b { color: var(--idiom); } .note.term b { color: var(--term); }
-    .board, .mindmap { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+    .board { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
     .board img { max-width: 160px; float: right; margin-left: 10px; border-radius: 4px; }
     .board::after { content: ""; display: block; clear: both; }
     .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    pre { margin: 4px 0 0; white-space: pre-wrap; font-size: 13px; }
+    .mapline { font-size: 13px; color: var(--muted); }
+    .mapline button { font: inherit; color: var(--accent); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+    pre { margin: 8px 16px; white-space: pre-wrap; font-size: 13px; }
+    /* Per-student filter: hide notes below the chosen confusion level. */
+    #feed.min-2 .note[data-level="1"],
+    #feed.min-3 .note[data-level="1"],
+    #feed.min-3 .note[data-level="2"] { display: none; }
+    #mindmap { display: block; width: 100%; height: calc(100vh - 50px); min-height: 360px; --markmap-text-color: var(--ink); --markmap-circle-open-bg: var(--bg); }
+    #mapEmpty { padding: 16px; color: var(--muted); }
   </style>
 </head>
 <body>
-<header id="status">Connecting…</header>
-<div id="feed"></div>
+<header>
+  <span id="status">Connecting…</span>
+  <span class="tabs">
+    <button id="tabFeed" aria-pressed="true">Feed</button>
+    <button id="tabMap" aria-pressed="false">Mind map</button>
+  </span>
+  <label>My explanations
+    <select id="minLevel">
+      <option value="1">Everything</option>
+      <option value="2">Standard</option>
+      <option value="3">Only tricky ones</option>
+    </select>
+  </label>
+</header>
+<main>
+  <div id="feed"></div>
+  <section id="mapPanel" hidden>
+    <p id="mapEmpty">No mind map yet. It appears after the teacher has said about 15 words (updates every ~45 s).</p>
+    <svg id="mindmap" aria-label="Lecture mind map"></svg>
+    <pre id="mapFallback" hidden></pre>
+  </section>
+</main>
 <script>
   // Bare-bones student view for testing the server before the Lovable app is wired up.
-  const feed = document.getElementById("feed");
-  const status = document.getElementById("status");
+  const $ = (id) => document.getElementById(id);
+  const feed = $("feed");
+  const status = $("status");
   let count = 0;
   let captions = new Map();
   let retry = 500;
+
+  // Each student picks how many explanations they see. Filtering happens on the phone,
+  // so it costs nothing and doesn't change what anyone else sees.
+  $("minLevel").onchange = () => (feed.className = `min-${$("minLevel").value}`);
 
   function el(tag, className, text) {
     const node = document.createElement(tag);
@@ -44,6 +84,59 @@
     if (window.katex) katex.render(latex, target, { throwOnError: false, displayMode: true });
     else target.textContent = latex;
   }
+
+  // ---------- Mind map tab ----------
+  // The server sends the whole outline as Markdown each time; markmap draws it as a tree.
+  // It's only drawn while the tab is visible (an SVG can't be laid out while hidden).
+
+  let latestMap = null;
+  let mapDirty = false;
+  let mm = null;
+  let transformer = null;
+
+  function showTab(map) {
+    $("mapPanel").hidden = !map;
+    feed.hidden = map;
+    $("tabMap").setAttribute("aria-pressed", String(map));
+    $("tabFeed").setAttribute("aria-pressed", String(!map));
+    $("tabMap").textContent = "Mind map";
+    if (map) {
+      if (mapDirty) renderMap();
+      else mm?.fit();
+    }
+  }
+  $("tabFeed").onclick = () => showTab(false);
+  $("tabMap").onclick = () => showTab(true);
+
+  function renderMap() {
+    if (!latestMap) return;
+    mapDirty = false;
+    $("mapEmpty").hidden = true;
+    const lib = window.markmap;
+    if (!lib?.Markmap || !lib?.Transformer) {
+      // Library didn't load (offline?): show the outline as text instead.
+      $("mapFallback").hidden = false;
+      $("mapFallback").textContent = latestMap;
+      return;
+    }
+    transformer ??= new lib.Transformer();
+    const { root } = transformer.transform(latestMap);
+    mm ??= lib.Markmap.create($("mindmap"), { duration: 300, maxWidth: 260 });
+    Promise.resolve(mm.setData(root)).then(() => mm.fit());
+  }
+  window.addEventListener("load", () => !$("mapPanel").hidden && renderMap());
+
+  function resetMap() {
+    latestMap = null;
+    mapDirty = false;
+    mm?.destroy?.();
+    mm = null;
+    $("mindmap").replaceChildren();
+    $("mapEmpty").hidden = false;
+    $("mapFallback").hidden = true;
+  }
+
+  // ---------- Events ----------
 
   function handle(event) {
     count++;
@@ -60,7 +153,12 @@
     } else if (event.type === "annotation") {
       const entry = captions.get(event.captionId);
       const note = el("div", `note ${event.kind}`);
-      note.append(el("b", "", `${event.kind === "idiom" ? "Idiom" : "Term"}: “${event.phrase}”`), ` — ${event.meaning}`);
+      note.dataset.level = String(event.level ?? 2);
+      note.append(
+        el("b", "", `${event.kind === "idiom" ? "Idiom" : "Term"}: “${event.phrase}”`),
+        ` — ${event.meaning} `,
+        el("span", "label", `level ${event.level ?? "?"}`),
+      );
       (entry ? entry.box : feed).append(note);
     } else if (event.type === "board") {
       const card = el("div", "board");
@@ -77,12 +175,22 @@
       }
       feed.append(card);
     } else if (event.type === "mindmap") {
-      const box = el("div", "mindmap");
-      box.append(el("div", "label", "Mind map update"), el("pre", "", event.markdown));
-      feed.append(box);
+      latestMap = event.markdown;
+      const topics = (event.markdown.match(/^## /gm) ?? []).length;
+      const line = el("div", "mapline", `Mind map updated · ${topics} topic${topics === 1 ? "" : "s"} · `);
+      const view = el("button", "", "View");
+      view.onclick = () => showTab(true);
+      line.append(view);
+      feed.append(line);
+      if ($("mapPanel").hidden) {
+        mapDirty = true;
+        $("tabMap").textContent = "Mind map •";
+      } else {
+        renderMap();
+      }
     }
     status.textContent = `Live · ${count} events`;
-    window.scrollTo(0, document.body.scrollHeight);
+    if (!feed.hidden) window.scrollTo(0, document.body.scrollHeight);
   }
 
   function connect() {
@@ -93,6 +201,7 @@
       captions = new Map();
       count = 0;
       retry = 500;
+      resetMap();
       status.textContent = "Live · waiting for events";
     };
     ws.onmessage = (e) => handle(JSON.parse(e.data));

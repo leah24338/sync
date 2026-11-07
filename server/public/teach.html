@@ -45,6 +45,32 @@
   </section>
 
   <section>
+    <h2>Explanations (for everyone)</h2>
+    <div class="row">
+      <label>Idioms &amp; sarcasm
+        <select id="idioms">
+          <option value="off">Off</option>
+          <option value="tricky">Only tricky ones</option>
+          <option value="standard">Standard</option>
+          <option value="all">Everything</option>
+        </select>
+      </label>
+      <label>Key terms
+        <select id="terms">
+          <option value="off">Off</option>
+          <option value="tricky">Only advanced ones</option>
+          <option value="standard">Standard</option>
+          <option value="all">Everything</option>
+        </select>
+      </label>
+    </div>
+    <div class="status" id="settingsStatus">
+      What the AI looks for. Turning both off skips the AI call on every sentence, which is most of
+      the running cost. Each student can still show fewer explanations in their own settings.
+    </div>
+  </section>
+
+  <section>
     <h2>2. Camera → whiteboard</h2>
     <div class="row">
       <button class="primary" id="camStart">Start camera</button>

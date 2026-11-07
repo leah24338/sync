@@ -10,7 +10,7 @@
 | Team | 2 people: Person 1 = pipeline (local, with Claude Code), Person 2 = student app (Lovable). **TODO**: put names on the roles |
 | MVP scope | Decided, trimmed for two people (below) |
 | Student app | Proposed: built in Lovable (100 credits), synced to GitHub, cloned into `web/` |
-| Server + teacher page | **Built (v1)** in `server/`, tested with the demo replay. Not yet tested with real keys. How it works and why: `ARCHITECTURE.md` |
+| Server + teacher page | **Built (v1)** in `server/`. Captions, notes, board reading and mind map tested end to end with real keys. How it works and why: `ARCHITECTURE.md` |
 | Runtime AI | Claude Opus 5.5 (`claude-opus-5-5`) called from our server. Lovable's built-in AI is **not** used |
 | Speech-to-text | Deepgram streaming (AssemblyAI as backup) |
 | Tunnel | cloudflared quick tunnel (ngrok as backup) |
@@ -37,6 +37,9 @@ Every feature is just a different view of that stream.
 - Figurative-language notes: idioms explained inline, tap to expand, opt-in "Literal mode"
 - Settings panel: font (Atkinson Hyperlegible / OpenDyslexic / Lexend), size, spacing,
   contrast, density presets (Focus / Standard / Detailed)
+- Explanation amount, two layers (built on the server side): the teacher sets what the AI looks
+  for (Off / Only tricky / Standard / Everything, for idioms and terms separately); each student
+  filters what they see on their own phone by the note's 1–3 `level`
 
 **Should have (after the core works end to end)**
 - Evolving mind map (view built early in Lovable on mock data; server side is one Claude call)
@@ -114,7 +117,7 @@ event, then streams new ones. Student app uses live mode with `?mode=live`, othe
 
 ### Pipeline rules
 
-- **Captions never wait for AI.** Raw caption shows instantly; annotations attach 1–2 s later.
+- **Captions never wait for AI.** Raw caption shows instantly; annotations attach 2–3 s later (measured).
 - **Board frames:** start with the manual "Capture board" button. If time allows, add
   auto-capture: downscale to tiny grayscale, diff against the last sent frame, send only
   when the board changed AND stayed still ~2 s. Max ~1 call / 5–10 s. Always send the

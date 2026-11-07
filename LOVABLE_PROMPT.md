@@ -29,7 +29,8 @@ was said and written. A separate local server (not built here) produces the data
 ```ts
 export type LectureEvent =
   | { type: "caption"; id: string; t: number; text: string; final: boolean }
-  | { type: "annotation"; captionId: string; kind: "idiom" | "term"; phrase: string; meaning: string }
+  | { type: "annotation"; captionId: string; kind: "idiom" | "term"; phrase: string; meaning: string;
+      level: 1 | 2 | 3 } // how likely it is to confuse a student: 1 = most know it, 3 = likely to confuse
   | { type: "board"; id: string; t: number; snapshotUrl: string;
       blocks: { id: string; kind: "text" | "equation"; content: string }[] } // equations are LaTeX
   | { type: "mindmap"; t: number; markdown: string };
@@ -69,7 +70,9 @@ export type LectureEvent =
   - **Focus:** captions and board cards only, large text, annotations collapsed until tapped
   - **Standard:** the default
   - **Detailed:** timestamps on every item, all annotations expanded
-- "Explain idioms and key terms" toggle (on by default)
+- "Explanations" choice: **Everything** (level 1+, the default) / **Standard** (level 2+) /
+  **Only tricky ones** (level 3 only) / **Off**. It hides annotations below the chosen `level`
+  on this phone only.
 - Read aloud toggle: speak each new FINAL caption with the browser's SpeechSynthesis, plus
   a speech-rate slider
 - Apply settings through CSS variables on the root element. Save them to localStorage,
@@ -100,20 +103,36 @@ dashboard and not childish.
   {"type":"caption","id":"c1","t":0,"text":"Okay everyone, today we're","final":false},
   {"type":"caption","id":"c1","t":1500,"text":"Okay everyone, today we're tackling quadratic equations.","final":true},
   {"type":"caption","id":"c2","t":4500,"text":"Don't worry, once you see the pattern this is a piece of cake.","final":true},
-  {"type":"annotation","captionId":"c2","kind":"idiom","phrase":"a piece of cake","meaning":"Very easy."},
+  {"type":"annotation","captionId":"c2","kind":"idiom","phrase":"a piece of cake","meaning":"Very easy.","level":2},
   {"type":"caption","id":"c3","t":9000,"text":"A quadratic is any equation where the highest power of x is two.","final":true},
-  {"type":"annotation","captionId":"c3","kind":"term","phrase":"quadratic","meaning":"An equation whose highest power of the variable is 2, like ax² + bx + c = 0."},
+  {"type":"annotation","captionId":"c3","kind":"term","phrase":"quadratic","meaning":"An equation whose highest power of the variable is 2, like ax² + bx + c = 0.","level":2},
   {"type":"mindmap","t":11000,"markdown":"# Quadratic equations\n## Definition\n- Highest power of x is 2"},
   {"type":"board","id":"b1","t":15000,"snapshotUrl":"/placeholder.svg","blocks":[{"id":"k1","kind":"text","content":"Standard form"},{"id":"k2","kind":"equation","content":"ax^2 + bx + c = 0"}]},
   {"type":"caption","id":"c4","t":19000,"text":"As a rule of thumb, always get it into standard form first.","final":true},
-  {"type":"annotation","captionId":"c4","kind":"idiom","phrase":"rule of thumb","meaning":"A general guideline that usually works, not a strict rule."},
+  {"type":"annotation","captionId":"c4","kind":"idiom","phrase":"rule of thumb","meaning":"A general guideline that usually works, not a strict rule.","level":2},
   {"type":"caption","id":"c5","t":24000,"text":"Then we plug a, b and c into the quadratic formula.","final":true},
   {"type":"board","id":"b2","t":28000,"snapshotUrl":"/placeholder.svg","blocks":[{"id":"k1","kind":"text","content":"Standard form"},{"id":"k2","kind":"equation","content":"ax^2 + bx + c = 0"},{"id":"k3","kind":"text","content":"Quadratic formula"},{"id":"k4","kind":"equation","content":"x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"}]},
   {"type":"mindmap","t":31000,"markdown":"# Quadratic equations\n## Definition\n- Highest power of x is 2\n## Standard form\n- ax² + bx + c = 0\n## Quadratic formula\n- x = (−b ± √(b² − 4ac)) / 2a"},
   {"type":"caption","id":"c6","t":35000,"text":"The part under the square root is called the discriminant.","final":true},
-  {"type":"annotation","captionId":"c6","kind":"term","phrase":"discriminant","meaning":"b² − 4ac. Its sign tells you how many real solutions there are."},
+  {"type":"annotation","captionId":"c6","kind":"term","phrase":"discriminant","meaning":"b² − 4ac. Its sign tells you how many real solutions there are.","level":3},
   {"type":"caption","id":"c7","t":40000,"text":"Oh great, another negative discriminant.","final":true},
-  {"type":"annotation","captionId":"c7","kind":"idiom","phrase":"Oh great","meaning":"Said sarcastically: the speaker isn't actually happy. A negative discriminant means there are no real solutions."},
+  {"type":"annotation","captionId":"c7","kind":"idiom","phrase":"Oh great","meaning":"Said sarcastically: the speaker isn't actually happy. A negative discriminant means there are no real solutions.","level":3},
   {"type":"mindmap","t":43000,"markdown":"# Quadratic equations\n## Definition\n- Highest power of x is 2\n## Standard form\n- ax² + bx + c = 0\n## Quadratic formula\n- x = (−b ± √(b² − 4ac)) / 2a\n## Discriminant\n- b² − 4ac\n- Negative → no real solutions"}
 ]
 ```
+
+---
+
+# Follow-up prompts
+
+Use these only if the first prompt above was already pasted before they were added.
+
+## 1. Explanation levels (added 2026-11-07)
+
+> Annotation events now include a `level` field: `1 | 2 | 3` (how likely the phrase is to
+> confuse a student: 1 = most students know it, 3 = likely to confuse). Add it to the
+> `LectureEvent` type in `src/lib/events.ts` and to every annotation in the mock data:
+> "a piece of cake" 2, "quadratic" 2, "rule of thumb" 2, "discriminant" 3, "Oh great" 3.
+> In Settings, replace the "Explain idioms and key terms" toggle with an "Explanations" choice:
+> Everything (level 1+, default) / Standard (level 2+) / Only tricky ones (level 3 only) / Off.
+> It hides annotations below the chosen level on this phone only. Save it with the other settings.
